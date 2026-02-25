@@ -1,0 +1,52 @@
+# ADK
+.adk
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Environment variables
+.env
+.env.local
+
+# Google Cloud credentials
+*.json
+!pyproject.toml
+service-account*.json
+credentials*.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Ruff
+.ruff_cache/
+
+# UV
+uv.lock
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
