@@ -379,8 +379,49 @@ def fetch_product_from_api(product_id: str) -> Dict[str, Any]:
     }
 
 
+def extract_image_urls_for_vision(products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Extract image URLs from products for vision AI analysis.
+    
+    Args:
+        products: List of product dictionaries containing image URLs
+        
+    Returns:
+        List[Dict]: List of product IDs with their image URLs
+    """
+    image_data = []
+    
+    for product in products:
+        product_id = product.get('id') or product.get('mirakl_product_id') or 'unknown'
+        
+        # Extract image URL from product
+        images = product.get('images', [])
+        if not images:
+            # Try alternate structure
+            data = product.get('data', {})
+            main_image = data.get('main_image', {})
+            image_url = main_image.get('original_url') or main_image.get('source')
+        else:
+            image_url = images[0].get('url') if images else None
+        
+        if image_url:
+            image_data.append({
+                'product_id': product_id,
+                'image_url': image_url
+            })
+        else:
+            image_data.append({
+                'product_id': product_id,
+                'image_url': None,
+                'error': 'No image URL found'
+            })
+    
+    return image_data
+
+
 # Create ADK FunctionTool wrappers for proper schema generation
 validate_image_tool = FunctionTool(func=validate_image)
 validate_attributes_tool = FunctionTool(func=Attribute_validation)
 fetch_products_tool = FunctionTool(func=fetch_products_from_mirakl)
 fetch_product_tool = FunctionTool(func=fetch_product_from_api)
+extract_image_urls_tool = FunctionTool(func=extract_image_urls_for_vision)
