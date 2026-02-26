@@ -1,32 +1,57 @@
 import requests
 from io import BytesIO
 from PIL import Image
+from typing import Dict, Any, List
+from google.adk.tools import FunctionTool
 
-def validate_image(image_url:str)->dict:
+
+def validate_image(products: List[Dict[str, Any]]) -> Dict[str, Any]:
     """ 
-    Download an image and validate image dimensions
+    Download and validate image dimensions for multiple products sequentially.
+    
     Args:
-        image_url (str): URL of the image to download
+        products: List of product dictionaries containing image URLs.
+                  Each product should have 'id' or 'mirakl_product_id' and 'images' list.
     
     Returns:
-        dict: Validation result with status and details
+        dict: Validation results with per-product results and summary
     """
-
     min_width = 1920
     min_height = 1080
+    results = []
     
-    try:
-        response = requests.get(image_url, timeout=10)
+    # Process each product sequentially
+    for product in products:
+        product_id = product.get('id') or product.get('mirakl_product_id') or 'unknown'
         
-        response.raise_for_status()
-
-        img = Image.open(BytesIO(response.content))
-
-        width, height = img.size
-
-        is_valid = width >= min_width and height >= min_height
-
-        result = {
+        # Extract image URL from product
+        images = product.get('images', [])
+        if not images:
+            # Try alternate structure
+            data = product.get('data', {})
+            main_image = data.get('main_image', {})
+            image_url = main_image.get('original_url') or main_image.get('source')
+        else:
+            image_url = images[0].get('url') if images else None
+        
+        if not image_url:
+            results.append({
+                'product_id': product_id,
+                'image_validation': {'valid': False, 'error': 'No image URL found'}
+            })
+            continue
+        
+        # Validate the image
+        try:
+            response = requests.get(image_url, timeout=10)
+            response.raise_for_status()
+            
+            img = Image.open(BytesIO(response.content))
+            width, height = img.size
+            
+            is_valid = width >= min_width and height >= min_height
+            
+            validation_result = {
                 'valid': is_valid,
                 'width': width,
                 'height': height,
@@ -34,14 +59,37 @@ def validate_image(image_url:str)->dict:
                 'actual': f"{width}×{height}",
                 'message': 'Image meets requirements' if is_valid else f'Image too small: {width}×{height} (minimum {min_width}×{min_height})'
             }
-        
-        return result
-
-    except requests.exceptions.RequestException as e:
-        return {'valid': False, 'error': f'Download failed: {str(e)}'}
+            
+            results.append({
+                'product_id': product_id,
+                'image_url': image_url,
+                'image_validation': validation_result
+            })
+            
+        except requests.exceptions.RequestException as e:
+            results.append({
+                'product_id': product_id,
+                'image_url': image_url,
+                'image_validation': {'valid': False, 'error': f'Download failed: {str(e)}'}
+            })
+        except Exception as e:
+            results.append({
+                'product_id': product_id,
+                'image_url': image_url,
+                'image_validation': {'valid': False, 'error': f'Validation failed: {str(e)}'}
+            })
     
-    except Exception as e:
-        return {'valid': False, 'error': f'Validation failed: {str(e)}'}
+    # Calculate summary
+    valid_count = sum(1 for r in results if r.get('image_validation', {}).get('valid', False))
+    
+    return {
+        'results': results,
+        'summary': {
+            'total': len(results),
+            'valid': valid_count,
+            'failed': len(results) - valid_count
+        }
+    }
 
 
 
@@ -54,320 +102,230 @@ def validate_image(image_url:str)->dict:
 
 
 required_attributes_by_product_type = {
-  "_common_required_for_all": [
-    "brand",
-    "product_title",
-    "product_description",
-    "price"
-  ],
-
-  "apparel_accessories": [
-    "size",
-    "size_system",
-    "color",
-    "material_composition",
-    "fit",
-    "care_instructions",
-    "gender_age_group"
-  ],
-
-  "footwear": [
-    "shoe_size",
-    "size_system",
-    "width",
-    "color",
-    "upper_material",
-    "outsole_material",
-    "closure_type",
-    "intended_use_activity"
-  ],
-
-  "beauty_personal_care": [
-    "net_volume_or_weight",
-    "product_form",
-    "skin_hair_type",
-    "benefit_concern",
-    "ingredients",
-    "usage_instructions",
-    "warnings"
-  ],
-
-  "health_wellness_otc_supplements": [
-    "count_or_net_weight",
-    "active_ingredients",
-    "dosage_strength",
-    "servings_per_container",
-    "directions",
-    "warnings",
-    "allergen_statement"
-  ],
-
-  "grocery_food_beverage": [
-    "net_weight_or_volume",
-    "ingredients",
-    "allergens",
-    "nutrition_facts",
-    "dietary_claims",
-    "storage_instructions",
-    "expiration_or_best_by_date"
-  ],
-
-  "baby_kids": [
-    "age_range",
-    "size_or_weight_range",
-    "material",
-    "care_cleaning_instructions",
-    "safety_warnings",
-    "certifications_compliance"
-  ],
-
-  "toys_games": [
-    "age_grading",
-    "pieces_count",
-    "material",
-    "dimensions",
-    "safety_warnings",
-    "certifications_compliance"
-  ],
-
-  "electronics_consumer": [
-    "model_number_mpn",
-    "key_specs",
-    "compatibility",
-    "connectivity",
-    "included_accessories",
-    "warranty"
-  ],
-
-  "computers_peripherals": [
-    "model_number_mpn",
-    "compatibility",
-    "interface_connection_type",
-    "key_specs",
-    "dimensions",
-    "warranty"
-  ],
-
-  "mobile_phones_accessories": [
-    "device_compatibility",
-    "connector_type",
-    "key_specs",
-    "color",
-    "included_items",
-    "warranty"
-  ],
-
-  "home_appliances": [
-    "capacity",
-    "dimensions",
-    "installation_requirements",
-    "power_requirements",
-    "key_features_programs",
-    "warranty"
-  ],
-
-  "home_kitchen": [
-    "material",
-    "dimensions_or_capacity",
-    "care_cleaning_instructions",
-    "set_contents_piece_count",
-    "compatibility_use_limits",
-    "safety_warnings"
-  ],
-
-  "furniture": [
-    "dimensions",
-    "material",
-    "color_finish",
-    "load_capacity",
-    "assembly_required",
-    "care_instructions"
-  ],
-
-  "home_improvement_hardware": [
-    "material_finish",
-    "size_measurements",
-    "compatibility_standards",
-    "intended_use_location",
-    "included_parts",
-    "installation_requirements"
-  ],
-
-  "tools_diy": [
-    "power_source",
-    "power_specs_voltage_amp_or_watt",
-    "performance_specs",
-    "compatibility_system_platform",
-    "included_accessories",
-    "warranty"
-  ],
-
-  "garden_outdoor_living": [
-    "material",
-    "dimensions",
-    "weather_uv_resistance",
-    "power_source_or_fuel_type",
-    "capacity_coverage",
-    "assembly_required"
-  ],
-
-  "sports_fitness": [
-    "size_fit",
-    "material",
-    "sport_activity_type",
-    "skill_level_use_case",
-    "safety_certifications",
-    "care_instructions"
-  ],
-
-  "automotive_parts_accessories": [
-    "vehicle_fitment",
-    "part_number",
-    "oem_aftermarket_flag",
-    "position",
-    "installation_notes",
-    "warranty"
-  ],
-
-  "pet_supplies": [
-    "pet_type",
-    "life_stage_or_size",
-    "material_or_ingredients",
-    "dimensions_or_capacity",
-    "usage_instructions",
-    "warnings"
-  ],
-
-  "office_supplies": [
-    "size_format",
-    "quantity_count",
-    "color",
-    "material",
-    "compatibility",
-    "pack_contents"
-  ],
-
-  "arts_crafts_sewing": [
-    "material",
-    "color",
-    "quantity_length_weight",
-    "compatibility",
-    "safety_non_toxic_flag",
-    "usage_care_instructions"
-  ],
-
-  "books_music_media": [
-    "format",
-    "creator_author_artist",
-    "publisher_label",
-    "release_date",
-    "language",
-    "identifier_isbn_upc"
-  ],
-
-  "video_games": [
-    "platform",
-    "format_physical_digital",
-    "edition",
-    "region",
-    "age_rating",
-    "players_online_local"
-  ],
-
-  "jewelry_watches": [
-    "material",
-    "size_length",
-    "stone_details",
-    "closure_clasp_type",
-    "care_instructions",
-    "warranty"
-  ],
-
-  "luggage_travel": [
-    "dimensions",
-    "capacity_liters",
-    "weight",
-    "material",
-    "wheel_handle_features",
-    "lock_type"
-  ],
-
-  "industrial_b2b_supplies": [
-    "specifications_standards",
-    "material_grade",
-    "dimensions_tolerances",
-    "operating_limits",
-    "compliance_certifications",
-    "traceability_lot_serial"
-  ]
+    "_common_required_for_all": [
+        "brand",
+        "title",
+        "product_category",
+        "main_image"
+    ],
+    "5_8_1_99999_125_1035": [
+        "care",
+        "origin",
+        "feature_1",
+        "feature_2",
+        "color_family",
+        "style_number",
+        "display_color",
+        "choking_hazard",
+        "fabric_material",
+        "meta_description",
+        "style_description",
+        "perishable_indicator",
+        "nrf_size-5_8_1_99999_125_1035"
+    ],
+    "3_14_63": [
+        "care",
+        "origin",
+        "prop_65",
+        "Priority",
+        "feature_1",
+        "feature_2",
+        "feature_3",
+        "is_ltl_item",
+        "color_family",
+        "containsPFAS",
+        "room-3_14_63",
+        "style_number",
+        "display_color",
+        "choking_hazard",
+        "fabric_material",
+        "meta_description",
+        "nrf_size-3_14_63",
+        "style_description",
+        "perishable_indicator",
+        "recommended_usage-3_14_63"
+    ],
+    "33_106_1479": [
+        "care",
+        "origin",
+        "feature_1",
+        "feature_2",
+        "color_family",
+        "style_number",
+        "display_color",
+        "choking_hazard",
+        "fabric_material",
+        "meta_description",
+        "style_description",
+        "nrf_size-33_106_1479",
+        "perishable_indicator",
+        "recommended_usage-33_106_1479"
+    ]
 }
 
 
 
 
-def Attribute_validation(product_type: str, attribution_dict: dict) -> dict:
+
+def Attribute_validation(products: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Verify the attributes based on the product type.
+    Verify the attributes based on the product type for multiple products sequentially.
     Validates both common required attributes and product-type-specific attributes.
     
     Args:
-        product_type: Name of the product type (e.g., 'apparel_accessories', 'footwear')
-        attribution_dict: Dictionary containing product attributes to validate
+        products: List of product dictionaries.
+                  Each product should have 'id', 'product_type', and 'product_attributes'.
         
     Returns:
-        dict: Validation result with status and details.
+        dict: Validation results with per-product results and summary
     """
+    results = []
     common_attributes = required_attributes_by_product_type.get("_common_required_for_all", [])
     
-    # Check if product type exists in configuration
-    if product_type not in required_attributes_by_product_type:
-       
-        all_required_attributes = common_attributes
+    # Process each product sequentially
+    for product in products:
+        product_id = product.get('id') or product.get('mirakl_product_id') or 'unknown'
+        
+        # Extract product type and attributes
+        product_type = product.get('product_type') or product.get('data', {}).get('product_category')
+        attribution_dict = product.get('product_attributes') or product.get('data', {})
+        
+        if not product_type:
+            results.append({
+                'product_id': product_id,
+                'attribute_validation': {
+                    'status': 'failed',
+                    'valid': False,
+                    'error': 'No product type found'
+                }
+            })
+            continue
+        
+        # Check if product type exists in configuration
+        if product_type not in required_attributes_by_product_type:
+            all_required_attributes = common_attributes
+        else:
+            product_specific_attributes = required_attributes_by_product_type[product_type]
+            # Combine common and product-specific attributes
+            all_required_attributes = common_attributes + product_specific_attributes
+        
+        missing_attributes = []
+        empty_attributes = []
+        
+        # Check for missing and empty attributes
+        for attribute in all_required_attributes:
+            if attribute not in attribution_dict:
+                missing_attributes.append(attribute)
+            elif attribution_dict[attribute] is None or attribution_dict[attribute] == "":
+                empty_attributes.append(attribute)
+        
+        # Determine validation status
+        if missing_attributes or empty_attributes:
+            validation_result = {
+                "status": "failed",
+                "valid": False,
+                "message": "Validation failed: Missing or empty required attributes",
+                "missing_attributes": missing_attributes,
+                "empty_attributes": empty_attributes,
+                "required_attributes": all_required_attributes,
+                "provided_attributes": list(attribution_dict.keys())
+            }
+        else:
+            validation_result = {
+                "status": "success",
+                "valid": True,
+                "message": "All required attributes are present and valid",
+                "missing_attributes": [],
+                "empty_attributes": [],
+                "required_attributes": all_required_attributes,
+                "provided_attributes": list(attribution_dict.keys())
+            }
+        
+        results.append({
+            'product_id': product_id,
+            'product_type': product_type,
+            'attribute_validation': validation_result
+        })
     
+    # Calculate summary
+    valid_count = sum(1 for r in results if r.get('attribute_validation', {}).get('valid', False))
     
-    else:
-        product_specific_attributes = required_attributes_by_product_type[product_type]
-    
-        # Combine common and product-specific attributes
-        all_required_attributes = common_attributes + product_specific_attributes
-    
-    missing_attributes = []
-    empty_attributes = []
-    
-    # Check for missing and empty attributes
-    for attribute in all_required_attributes:
-        if attribute not in attribution_dict:
-            missing_attributes.append(attribute)
-        elif attribution_dict[attribute] is None or attribution_dict[attribute] == "":
-            empty_attributes.append(attribute)
-    
-    # Determine validation status
-    if missing_attributes or empty_attributes:
-        return {
-            "status": "failed",
-            "valid": False,
-            "message": "Validation failed: Missing or empty required attributes",
-            "missing_attributes": missing_attributes,
-            "empty_attributes": empty_attributes,
-            "required_attributes": all_required_attributes,
-            "provided_attributes": list(attribution_dict.keys())
+    return {
+        'results': results,
+        'summary': {
+            'total': len(results),
+            'valid': valid_count,
+            'failed': len(results) - valid_count
         }
-    else:
-        return {
-            "status": "success",
-            "valid": True,
-            "message": "All required attributes are present and valid",
-            "missing_attributes": [],
-            "empty_attributes": [],
-            "required_attributes": all_required_attributes,
-            "provided_attributes": list(attribution_dict.keys())
-        }
+    }
+
+
 
 
 
 from typing import Dict, Any
 
 
+
+def fetch_products_from_mirakl(updated_since: str = None, updated_to: str = None, product_sku: str = None) -> List[Dict[str, Any]]:
+    """
+    Fetch products from Mirakl API.
+    Args:
+        updated_since (str): ISO 8601 date string (e.g., "2026-02-15T09:31:48Z")
+        updated_to (str): ISO 8601 date string (e.g., "2026-02-23T16:51:48Z")
+        product_sku (str): Optional product SKU filter (e.g., "4135850671899")
+    Returns:
+        List[Dict[str, Any]]: List of product data
+    """
+    url = "https://kohlsus-dev.mirakl.net/api/mcm/products/export"
+    params = {}
+    if updated_since:
+        params['updated_since'] = updated_since
+    if updated_to:
+        params['updated_to'] = updated_to
+    if product_sku:
+        params['product_sku'] = product_sku
+
+    headers = {
+        'Authorization': '504c4fc7-6402-48b3-bc29-34d82e964918',
+        'Accept': 'application/json'
+    }
+
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=30)
+        response.raise_for_status()
+        products = response.json()
+        
+        formatted_products = []
+        for p in products:
+            # Extract relevant fields
+            data = p.get('data', {})
+            product_sku = p.get('product_sku')
+            
+            # Extract image URL
+            main_image = data.get('main_image', {})
+            image_url = main_image.get('original_url') or main_image.get('source')
+            
+            product_info = {
+                "id": p.get('mirakl_product_id'),
+                "product_type": data.get('product_category'), # Using category as type
+                "product_sku": product_sku,
+                "product_attributes": {
+                    "product_title": data.get('title'),
+                    "brand": data.get('brand'),
+                    "sku": product_sku,
+                    # Add other attributes as needed from data
+                    **data # Include all other data fields
+                },
+                "images": [{"url": image_url}] if image_url else []
+            }
+            formatted_products.append(product_info)
+            
+        return formatted_products
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching products: {e}")
+        return []
 
 def fetch_product_from_api(product_id: str) -> Dict[str, Any]:
     """
@@ -420,3 +378,9 @@ def fetch_product_from_api(product_id: str) -> Dict[str, Any]:
         "images": images,
     }
 
+
+# Create ADK FunctionTool wrappers for proper schema generation
+validate_image_tool = FunctionTool(func=validate_image)
+validate_attributes_tool = FunctionTool(func=Attribute_validation)
+fetch_products_tool = FunctionTool(func=fetch_products_from_mirakl)
+fetch_product_tool = FunctionTool(func=fetch_product_from_api)
