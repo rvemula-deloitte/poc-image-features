@@ -14,6 +14,7 @@ poc-image-features/
 ├── sub_agents/                # Individual agent modules
 │   ├── extract_product/      # Tool 1: Fetch from external API
 │   ├── validate_image/       # Tool 2: Image dimension validation
+│   ├── validate_image_embedding/ # Tool 2b: Embedding-based image validation
 │   ├── validate_attribute/   # Tool 3: Attribute validation by product type
 │   ├── summarize_product/    # Summarization agent
 │   └── tools.py              # Shared tools for sub-agents
@@ -99,3 +100,61 @@ The agent will:
 2. Validate the image dimensions
 3. Check required attributes
 4. Store results in BigQuery
+
+## Embedding-Based Image Validation (New)
+
+An alternative to dimension-based image validation is the **embedding-based validation agent** that uses Vertex AI's MultiModalEmbedding model to verify if product images actually match their titles and descriptions.
+
+### How It Works
+
+1. **Downloads** the product image from the URL
+2. **Embeds** both the image and the product text (title + description) using Vertex AI
+3. **Calculates** cosine similarity between image and text embeddings
+4. **Validates** if similarity score meets the threshold (default: 0.70)
+
+### Usage
+
+The new agent is located in:
+- Agent: `sub_agents/validate_image_embedding_agent.py`
+- Tool: `tools/embedding_validation_tool.py`
+
+To use it, replace or complement the existing `validate_image_agent` in your pipeline.
+
+### Environment Variables
+
+Ensure these are set:
+```bash
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_CLOUD_LOCATION=us-central1  # or your preferred region
+```
+
+### Example Response
+
+```json
+{
+  "results": [
+    {
+      "product_id": "12345",
+      "image_url": "https://...",
+      "embedding_validation": {
+        "valid": true,
+        "message": "Image matches product description"
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "valid": 1,
+    "failed": 0,
+    "similarity_threshold": 0.70
+  }
+}
+```
+
+### Benefits Over Dimension-Only Validation
+
+- **Content verification**: Ensures image actually shows the product
+- **Detects wrong products**: Catches cases where wrong images are used
+- **Semantic matching**: Uses AI to understand image-text relationships
+- **Complements dimension checks**: Can be used alongside size validation
+
