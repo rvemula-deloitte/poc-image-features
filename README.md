@@ -28,13 +28,14 @@ poc-image-features/
 ```
 1. Extract Product (Tool 1)
    ↓ product_details
-2. Validate Image (Tool 2) → Check dimensions ≥1920×1080
-   ↓ image_validation_json
-3. Validate Attributes (Tool 3) → Check required fields by product_type
-   ↓ attribute_validation_json
-4. Summarize Results
-   ↓ summary
-5. Write to BigQuery (Tool 4) → Store raw_data + validated_data
+2. Parallel Validation
+   ├─ Validate Image (Tool 2) → Embedding-based validation
+   │  ↓ embedding_validation_json
+   └─ Validate Attributes (Tool 3) → Check required fields by product_type
+      ↓ attribute_validation_json
+3. Calculate Confidence Scores
+   ↓ scored_products
+4. Write to BigQuery (Tool 4) → Store validation results
    ↓ bigquery_result
 ```
 
@@ -97,8 +98,8 @@ Validate product with ID 1
 
 The agent will:
 1. Fetch product from DummyJSON API
-2. Validate the image dimensions
-3. Check required attributes
+2. Run image and attribute validation **in parallel** for better performance
+3. Calculate confidence scores based on validation results
 4. Store results in BigQuery
 
 ## Embedding-Based Image Validation (New)

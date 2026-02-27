@@ -12,16 +12,25 @@ from sub_agents.summarize_product_agent import summarize_product_agent
 from sub_agents.bigquery_write_agent import bigquery_write_agent
 
 
-# Root Sequential Agent - run validations sequentially to ensure output_key propagation
+# Parallel Agent for concurrent validation
+validation_parallel = ParallelAgent(
+    name="validation_parallel",
+    description="Run image and attribute validation in parallel",
+    sub_agents=[
+        validate_image_embedding_agent,  # Image validation -> embedding_validation_json
+        validate_attribute,              # Attribute validation -> attribute_validation_json
+    ],
+)
+
+
+# Root Sequential Agent - run validations in parallel for efficiency
 root_agent = SequentialAgent(
     name="product_validation_pipeline",
     description="Sequential agent pipeline for product extraction, validation, and storage",
     sub_agents=[
         extract_product,           # Step 1: Fetch products from API -> products_data
-        # validate_image_agent,      # Step 2: Image validation -> image_validation_results
-        validate_image_embedding_agent,  # Step 2: Embedding-based image validation -> embedding_validation_results
-        validate_attribute,        # Step 3: Attribute validation -> attribute_validation_results
-        confidence_score_agent,    # Step 4: Calculate confidence scores -> scored_products
-        # bigquery_write_agent,    # Step 5: Batch write to BigQuery
+        validation_parallel,       # Step 2: Run image + attribute validation in parallel
+        confidence_score_agent,    # Step 3: Calculate confidence scores -> scored_products
+        # bigquery_write_agent,    # Step 4: Batch write to BigQuery
     ],
 )
