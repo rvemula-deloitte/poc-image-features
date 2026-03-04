@@ -1,0 +1,200 @@
+# Product Validation Compliance Rules
+
+This document contains the compliance rules and validation requirements for product data validation.
+
+---
+
+## 1. Image Validation Requirements
+
+All product images must meet the following minimum specifications:
+
+| Requirement | Value |
+|-------------|-------|
+| Minimum Width | 1920 pixels |
+| Minimum Height | 1080 pixels |
+| Minimum Resolution | 1920×1080 (Full HD) |
+
+### Image Validation Rules
+
+- Images smaller than 1920×1080 pixels are considered **invalid**
+- Images meeting or exceeding 1920×1080 pixels are considered **valid**
+- Products without an image URL are marked as validation **failed**
+- Images that fail to download or process are marked as validation **failed**
+
+---
+
+## 2. Required Attributes by Product Type
+
+### 2.1 Common Required Attributes (All Products)
+
+All products, regardless of product type, must have the following attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| brand | The brand name of the product |
+| title | The product title |
+| product_category | The category classification of the product |
+| main_image | The main product image |
+
+---
+
+### 2.2 Product Type: 5_8_1_99999_125_1035
+
+Products with type `5_8_1_99999_125_1035` require the following specific attributes in addition to common attributes:
+
+| Attribute | Required |
+|-----------|----------|
+| care | Yes |
+| origin | Yes |
+| feature_1 | Yes |
+| feature_2 | Yes |
+| color_family | Yes |
+| style_number | Yes |
+| display_color | Yes |
+| choking_hazard | Yes |
+| fabric_material | Yes |
+| meta_description | Yes |
+| style_description | Yes |
+| perishable_indicator | Yes |
+| nrf_size-5_8_1_99999_125_1035 | Yes |
+
+---
+
+### 2.3 Product Type: 3_14_63
+
+Products with type `3_14_63` require the following specific attributes in addition to common attributes:
+
+| Attribute | Required |
+|-----------|----------|
+| care | Yes |
+| origin | Yes |
+| prop_65 | Yes |
+| Priority | Yes |
+| feature_1 | Yes |
+| feature_2 | Yes |
+| feature_3 | Yes |
+| is_ltl_item | Yes |
+| color_family | Yes |
+| containsPFAS | Yes |
+| room-3_14_63 | Yes |
+| style_number | Yes |
+| display_color | Yes |
+| choking_hazard | Yes |
+| fabric_material | Yes |
+| meta_description | Yes |
+| nrf_size-3_14_63 | Yes |
+| style_description | Yes |
+| perishable_indicator | Yes |
+| recommended_usage-3_14_63 | Yes |
+
+---
+
+### 2.4 Product Type: 33_106_1479
+
+Products with type `33_106_1479` require the following specific attributes in addition to common attributes:
+
+| Attribute | Required |
+|-----------|----------|
+| care | Yes |
+| origin | Yes |
+| feature_1 | Yes |
+| feature_2 | Yes |
+| color_family | Yes |
+| style_number | Yes |
+| display_color | Yes |
+| choking_hazard | Yes |
+| fabric_material | Yes |
+| meta_description | Yes |
+| style_description | Yes |
+| nrf_size-33_106_1479 | Yes |
+| perishable_indicator | Yes |
+| recommended_usage-33_106_1479 | Yes |
+
+---
+
+## 3. Attribute Validation Rules
+
+### 3.1 Validation Logic
+
+1. **Check Product Type Existence**: If product type is not found, validation fails
+2. **Determine Required Attributes**: Combine common attributes with product-type-specific attributes
+3. **Check for Missing Attributes**: Attributes that are not present in the product data
+4. **Check for Empty Attributes**: Attributes that exist but have `null` or empty string `""` values
+
+### 3.2 Validation Status
+
+| Status | Condition |
+|--------|-----------|
+| **Success** | All required attributes are present and have non-empty values |
+| **Failed** | One or more required attributes are missing or empty |
+
+### 3.3 Validation Response Fields
+
+- `status`: "success" or "failed"
+- `valid`: boolean (true/false)
+- `message`: Human-readable validation message
+- `missing_attributes`: List of attributes not present in product data
+- `empty_attributes`: List of attributes with null or empty values
+- `required_attributes`: Complete list of required attributes for the product type
+- `provided_attributes`: List of attributes actually provided in product data
+
+---
+
+## 4. Compliance Notes
+
+### 4.1 Choking Hazard Compliance
+
+Products require a `choking_hazard` attribute for safety compliance. This is required across all defined product types.
+
+### 4.2 California Prop 65 Compliance
+
+Product type `3_14_63` requires the `prop_65` attribute for California Proposition 65 compliance related to warnings about chemicals known to cause cancer or reproductive harm.
+
+### 4.3 PFAS Compliance
+
+Product type `3_14_63` requires the `containsPFAS` attribute to indicate whether the product contains per- and polyfluoroalkyl substances (PFAS).
+
+### 4.4 Perishable Products
+
+All product types require the `perishable_indicator` attribute to indicate whether the product is perishable.
+
+### 4.5 Large/Heavy Items (LTL)
+
+Product type `3_14_63` requires the `is_ltl_item` attribute to indicate if the product requires less-than-truckload (LTL) shipping.
+
+---
+
+## 5. Product Type Reference
+
+| Product Type Code | Description |
+|-------------------|-------------|
+| _common_required_for_all | Base attributes required for all products |
+| 5_8_1_99999_125_1035 | Product category type 1 |
+| 3_14_63 | Product category type 2 |
+| 33_106_1479 | Product category type 3 |
+
+---
+
+## 6. Summary of All Required Attributes
+
+### Complete Attribute List by Product Type
+
+#### All Products (Common)
+- brand
+- title
+- product_category
+- main_image
+
+#### Type 5_8_1_99999_125_1035 (Total: 17 attributes)
+Common (4) + Specific (13)
+
+#### Type 3_14_63 (Total: 24 attributes)
+Common (4) + Specific (20)
+
+#### Type 33_106_1479 (Total: 18 attributes)
+Common (4) + Specific (14)
+
+---
+
+*Document Version: 1.0*
+*Last Updated: February 2026*

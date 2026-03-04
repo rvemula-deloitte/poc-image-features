@@ -1,10 +1,10 @@
 """Embedding-based image validation agent using Vertex AI MultiModalEmbedding."""
 
-from google.adk.agents import LlmAgent, Agent
+from google.adk.agents import LlmAgent
 from tools.embedding_validation_tool import validate_image_embedding_tool
 
 
-validate_image_embedding_agent = Agent(
+validate_image_embedding_agent = LlmAgent(
     name='ImageEmbeddingValidatorAgent',
     model='gemini-2.5-flash',
     description='Validate product images against their descriptions using embeddings',
