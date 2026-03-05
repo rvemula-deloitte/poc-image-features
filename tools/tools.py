@@ -5,91 +5,36 @@ from typing import Dict, Any, List
 from google.adk.tools import FunctionTool
 
 
-def validate_image(products: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """ 
-    Download and validate image dimensions for multiple products sequentially.
-    
-    Args:
-        products: List of product dictionaries containing image URLs.
-                  Each product should have 'id' or 'mirakl_product_id' and 'images' list.
-    
-    Returns:
-        dict: Validation results with per-product results and summary
+def get_image_dimensions(url: str) -> Dict[str, Any]:
     """
-    min_width = 1920
-    min_height = 1080
-    results = []
-    
-    # Process each product sequentially
-    for product in products:
-        product_id = product.get('id') or product.get('mirakl_product_id') or 'unknown'
-        
-        # Extract image URL from product
-        images = product.get('images', [])
-        if not images:
-            # Try alternate structure
-            data = product.get('data', {})
-            main_image = data.get('main_image', {})
-            image_url = main_image.get('original_url') or main_image.get('source')
-        else:
-            image_url = images[0].get('url') if images else None
-        
-        if not image_url:
-            results.append({
-                'product_id': product_id,
-                'image_validation': {'valid': False, 'error': 'No image URL found'}
-            })
-            continue
-        
-        # Validate the image
-        try:
-            response = requests.get(image_url, timeout=10)
-            response.raise_for_status()
-            
-            img = Image.open(BytesIO(response.content))
-            width, height = img.size
-            
-            is_valid = width >= min_width and height >= min_height
-            
-            validation_result = {
-                'valid': is_valid,
-                'width': width,
-                'height': height,
-                'min_required': f"{min_width}×{min_height}",
-                'actual': f"{width}×{height}",
-                'message': 'Image meets requirements' if is_valid else f'Image too small: {width}×{height} (minimum {min_width}×{min_height})'
-            }
-            
-            results.append({
-                'product_id': product_id,
-                'image_url': image_url,
-                'image_validation': validation_result
-            })
-            
-        except requests.exceptions.RequestException as e:
-            results.append({
-                'product_id': product_id,
-                'image_url': image_url,
-                'image_validation': {'valid': False, 'error': f'Download failed: {str(e)}'}
-            })
-        except Exception as e:
-            results.append({
-                'product_id': product_id,
-                'image_url': image_url,
-                'image_validation': {'valid': False, 'error': f'Validation failed: {str(e)}'}
-            })
-    
-    # Calculate summary
-    valid_count = sum(1 for r in results if r.get('image_validation', {}).get('valid', False))
-    
-    return {
-        'results': results,
-        'summary': {
-            'total': len(results),
-            'valid': valid_count,
-            'failed': len(results) - valid_count
+    Download an image from the given URL and return its dimensions.
+
+    Args:
+        url: The public URL of the image to inspect.
+
+    Returns:
+        dict with keys:
+            - url (str): the URL that was checked
+            - width (int): image width in pixels
+            - height (int): image height in pixels
+            - format (str): image format (e.g. JPEG, PNG)
+            - error (str): present only when the image could not be fetched/opened
+    """
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        img = Image.open(BytesIO(response.content))
+        width, height = img.size
+        return {
+            'url': url,
+            'width': width,
+            'height': height,
+            'format': img.format or 'unknown',
         }
-    }
+    except requests.exceptions.RequestException as e:
+        return {'url': url, 'error': f'Download failed: {str(e)}'}
+    except Exception as e:
+        return {'url': url, 'error': f'Could not read image: {str(e)}'}
 
 
 
@@ -380,7 +325,7 @@ def fetch_product_from_api(product_id: str) -> Dict[str, Any]:
 
 
 # Create ADK FunctionTool wrappers for proper schema generation
-validate_image_tool = FunctionTool(func=validate_image)
+get_image_dimensions_tool= FunctionTool(func=get_image_dimensions)
 validate_attributes_tool = FunctionTool(func=Attribute_validation)
 fetch_products_tool = FunctionTool(func=fetch_products_from_mirakl)
 fetch_product_tool = FunctionTool(func=fetch_product_from_api)

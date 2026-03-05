@@ -10,17 +10,18 @@ All product images must meet the following minimum specifications:
 
 | Requirement | Value |
 |-------------|-------|
-| Minimum Width | 1920 pixels |
-| Minimum Height | 1080 pixels |
 | Minimum Resolution | 1920×1080 (Full HD) |
 
 ### Image Validation Rules
 
+- Product title and description should match with the contents of the image. Otherwise **failed**.
 - Images smaller than 1920×1080 pixels are considered **invalid**
 - Images meeting or exceeding 1920×1080 pixels are considered **valid**
+- Images should not be blurred. if blurred it can be considered **Invalid**.
+- Dominant object in the Image has to be the product mentioned. if not compliant ir can be considered **Invalid**
 - Products without an image URL are marked as validation **failed**
 - Images that fail to download or process are marked as validation **failed**
-
+- Product title and description should match with the contents of the image. Otherwise **failed**.
 ---
 
 ## 2. Required Attributes by Product Type

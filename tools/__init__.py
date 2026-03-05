@@ -7,12 +7,12 @@ from tools.embedding_validation_tool import (
 )
 from tools.tools import (
     fetch_products_from_mirakl,
-    validate_image,
+    get_image_dimensions,
     Attribute_validation,
     fetch_product_from_api,
     # FunctionTool wrapped versions
     fetch_products_tool,
-    validate_image_tool,
+    get_image_dimensions_tool,
     validate_attributes_tool,
     fetch_product_tool,
 )
@@ -22,12 +22,12 @@ __all__ = [
     "validate_image_embedding",
     "validate_image_embedding_tool",
     "fetch_products_from_mirakl",
-    "validate_image",
+    "get_image_dimensions",
     "Attribute_validation",
     "fetch_product_from_api",
     # FunctionTool wrapped versions (use these with LlmAgent)
     "fetch_products_tool",
-    "validate_image_tool",
+    "get_image_dimensions_tool",
     "validate_image_embedding_tool",
     "validate_attributes_tool",
     "fetch_product_tool",
