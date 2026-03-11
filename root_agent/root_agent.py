@@ -17,7 +17,7 @@ try:
         name="product_validation_pipeline",
         description="Sequential agent pipeline for product extraction, validation, and storage",
         sub_agents=[
-            extract_product,                 # Step 1: Fetch products from API -> products_data
+            # extract_product,                 # Step 1: Fetch products from API -> products_data
             validate_image_agent,  # Step 2: Image validation -> image_validation_json
             validate_and_score_agent,        # Step 3: Attribute validation + confidence scoring -> validation_and_score_json
             # bigquery_write_agent,          # Step 4: Batch write to BigQuery

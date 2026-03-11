@@ -63,20 +63,10 @@ try:
     {
     "results": [
         {
-        "product_id": "<id>",
-        "product_type": "<type>",
-        "validation": {
-            "image_valid": true|false,
-            "attributes_valid": true|false,
-            "missing_attributes": [],
-            "empty_attributes": [],
-            "issues": ["<list of compliance issues found>"]
-        },
-        "reliability": {
-            "confidence_score": <0-100>,
-            "confidence_level": "High|Good|Medium|Low",
-            "reasoning": "<explanation of why this score was given>"
-        }
+        "mirakl_product_id": "<id>",
+        "product_sku": "<id>",
+        "confidence_score": <0-100>,
+        "ai_comments": "<reasoning and issues found. mention specific missing attributes, image validation failures, and any other compliance issues point by point.>",
         }
     ],
     "summary": {
