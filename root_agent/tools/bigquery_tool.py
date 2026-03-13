@@ -6,7 +6,7 @@ from typing import Any
 from google.cloud import bigquery
 from google.adk.tools import FunctionTool
 
-from models import ValidationRecord
+from ..models import ValidationRecord
 
 # Singleton client instance
 _bq_client: bigquery.Client | None = None

@@ -3,12 +3,12 @@
 from google.adk.agents import SequentialAgent, ParallelAgent
 
 # Import all sub-agents
-from sub_agents.extract_product_agent import extract_product
-from sub_agents.validate_image_agent import validate_image_agent
-# from sub_agents.validate_image_embedding_agent import validate_image_embedding_agent
-from sub_agents.validate_attribute_agent import validate_and_score_agent
-# from sub_agents.summarize_product_agent import summarize_product_agent
-# from sub_agents.bigquery_write_agent import bigquery_write_agent
+from .sub_agents.extract_product_agent import extract_product
+from .sub_agents.validate_image_agent import validate_image_agent
+# from .sub_agents.validate_image_embedding_agent import validate_image_embedding_agent
+from .sub_agents.validate_attribute_agent import validate_and_score_agent
+# from .sub_agents.summarize_product_agent import summarize_product_agent
+# from .sub_agents.bigquery_write_agent import bigquery_write_agent
 
 
 # Root Sequential Agent - validates and scores products

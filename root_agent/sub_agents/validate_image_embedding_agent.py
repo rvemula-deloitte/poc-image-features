@@ -1,7 +1,7 @@
 """Embedding-based image validation agent using Vertex AI MultiModalEmbedding."""
 
 from google.adk.agents import LlmAgent
-from tools.embedding_validation_tool import validate_image_embedding_tool
+from ..tools.embedding_validation_tool import validate_image_embedding_tool
 
 
 validate_image_embedding_agent = LlmAgent(

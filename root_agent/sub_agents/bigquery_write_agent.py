@@ -1,7 +1,7 @@
 """BigQuery Write Agent - Tool 4."""
 
 from google.adk.agents import LlmAgent
-from tools import bigquery_write_tool
+from ..tools import bigquery_write_tool
 
 
 bigquery_write_agent = LlmAgent(

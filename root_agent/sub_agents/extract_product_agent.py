@@ -1,5 +1,5 @@
 from google.adk.agents import LlmAgent
-from tools.tools import fetch_products_tool
+from ..tools.tools import fetch_products_tool
 
 
 extract_product = LlmAgent(

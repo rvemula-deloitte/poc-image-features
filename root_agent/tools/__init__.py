@@ -1,11 +1,11 @@
 """Tools for product validation."""
 
-from tools.bigquery_tool import bigquery_write_tool
-from tools.embedding_validation_tool import (
+from .bigquery_tool import bigquery_write_tool
+from .embedding_validation_tool import (
     validate_image_embedding,
     validate_image_embedding_tool,
 )
-from tools.tools import (
+from .tools import (
     fetch_products_from_mirakl,
     get_image_dimensions,
     Attribute_validation,

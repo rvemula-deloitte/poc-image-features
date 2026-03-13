@@ -1,8 +1,8 @@
 from google.adk.agents import LlmAgent
 from google.adk.tools import AgentTool
-from tools.tools import get_image_dimensions_tool
-from sub_agents.compliance_search_agent import compliance_search_agent
-from sub_agents.url_context_agent import url_context_agent
+from ..tools.tools import get_image_dimensions_tool
+from .compliance_search_agent import compliance_search_agent
+from .url_context_agent import url_context_agent
 
 
 # Create AgentTool wrappers
