@@ -4,6 +4,7 @@ from google.adk.agents import SequentialAgent, ParallelAgent
 
 # Import all sub-agents
 from .sub_agents.extract_product_agent import extract_product
+from .sub_agents.compliance_search_agent import compliance_search_agent
 from .sub_agents.validate_image_agent import validate_image_agent
 # from .sub_agents.validate_image_embedding_agent import validate_image_embedding_agent
 from .sub_agents.validate_attribute_agent import validate_and_score_agent
@@ -18,7 +19,8 @@ try:
         description="Sequential agent pipeline for product extraction, validation, and storage",
         sub_agents=[
             # extract_product,                 # Step 1: Fetch products from API -> products_data
-            validate_image_agent,  # Step 2: Image validation -> image_validation_json
+            compliance_search_agent, # Step 2: Fetch image compliance rules -> compliance_search_result
+            validate_image_agent,    # Step 3: Image validation using compliance rules -> image_validation_json
             validate_and_score_agent,        # Step 3: Attribute validation + confidence scoring -> validation_and_score_json
             # bigquery_write_agent,          # Step 4: Batch write to BigQuery
         ],

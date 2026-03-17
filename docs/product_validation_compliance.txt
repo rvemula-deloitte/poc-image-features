@@ -12,16 +12,43 @@ All product images must meet the following minimum specifications:
 |-------------|-------|
 | Minimum Resolution | 1920×1080 (Full HD) |
 
-### Image Validation Rules
+### 1.1 General Image Rules
 
-- Product title and description should match with the contents of the image. Otherwise **failed**.
-- Images smaller than 1920×1080 pixels are considered **invalid**
-- Images meeting or exceeding 1920×1080 pixels are considered **valid**
-- Images should not be blurred. if blurred it can be considered **Invalid**.
-- Dominant object in the Image has to be the product mentioned. if not compliant ir can be considered **Invalid**
-- Products without an image URL are marked as validation **failed**
-- Images that fail to download or process are marked as validation **failed**
-- Product title and description should match with the contents of the image. Otherwise **failed**.
+- **Minimum resolution**: 1920×1080. Images below this threshold are **invalid**.
+- Images meeting or exceeding 1920×1080 pixels are considered **valid**.
+- Images should not be blurred — blurred images are **invalid**.
+- The dominant object in the image must be the product mentioned in the title. If not, the image is **invalid**.
+- Product title and description must match the contents of the image. A mismatch is a **failure**.
+- Products without an image URL are marked as validation **failed**.
+- Images that fail to download or process are marked as validation **failed**.
+
+### 1.2 Main Image Requirements
+
+- Must clearly show the item being sold.
+- **No text overlays or watermarks** are permitted on the main image.
+- The image must correctly represent the product described in the title.
+- **Size chart**: Required for apparel products — must be included in supplemental images.
+
+### 1.3 Background & Aspect Ratio by Category
+
+| Category | Background | Aspect Ratio |
+|----------|------------|--------------|
+| Ready to Wear | White background required | Some deviation from 1:1 is permitted |
+| Lifestyle Products | Non-white background permitted | Must be exactly 1:1 |
+
+### 1.4 Alternate Image Requirements
+
+Alternate (supplemental) images are subject to the same general quality rules as the main image and additionally must satisfy:
+
+- All alternate images must meet the **minimum resolution of 1920×1080**.
+- Alternate images must not be blurred or fail to load — any such image is **invalid**.
+- Alternate images **may contain lifestyle or contextual backgrounds** (not restricted to white).
+- Text overlays and watermarks are **not permitted** on any alternate image.
+- Each alternate image must be **distinct** — duplicate images across main and alternate slots are **not allowed**.
+- For **apparel products**, at least one alternate image must display the **size chart**.
+- Alternate images should provide **additional product perspectives** (e.g. back, side, detail, in-use shots) — images that add no new information are considered **low quality**.
+- The product shown in alternate images must be **consistent** with the main image and the product title.
+
 ---
 
 ## 2. Required Attributes by Product Type
@@ -197,5 +224,54 @@ Common (4) + Specific (14)
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: February 2026*
+## 7. Extended Validation Rules
+
+### 7.1 Category Correctness
+
+- The P1:P2:P3 category hierarchy must be logically consistent with the product image, title, description, and features.
+- A mismatch between the assigned category and the product content is a validation **failure**.
+
+---
+
+### 7.2 Variant Rules
+
+- Each variant must have a **unique color and size combination**.
+- Variants must be **grouped by color**; sizes must be unique within a color group.
+- Size value **`000` is not permitted**.
+- Duplicate variants (identical color + size) are **not allowed**.
+- The variant image must logically match the color supplied by the vendor.
+
+---
+
+### 7.3 Restricted / Prohibited Categories (Vendor Agreements)
+
+Products in the following categories must be **rejected upfront** due to exclusive vendor agreements:
+
+| Category | Competing Vendor | Notes |
+|----------|-----------------|-------|
+| Baby Gear | Key baby gear vendor | Definition of "Baby Gear" requires further clarification |
+| Team / Licensed Sports Products | Fanatics | All team-branded merchandise is excluded |
+| Beauty Products | Sephora | All beauty-related products are excluded |
+
+---
+
+### 7.4 Brand Consistency
+
+- The brand displayed in product images must match the brand selected in the marketplace (Mirakl).
+- A brand mismatch across any of the following signals is a validation **failure**:
+  - Main image vs. brand field
+  - Title vs. brand field
+  - Description or features vs. brand field
+
+---
+
+### 7.5 Seller Approval Scope
+
+- A seller should only be permitted to list products within the categories they are approved for.
+- Listings outside the seller's approved category scope must be **rejected**.
+- *(Further definition required to establish evaluation criteria.)*
+
+---
+
+*Document Version: 1.1*
+*Last Updated: March 2026*

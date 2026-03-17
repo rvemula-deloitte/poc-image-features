@@ -1,12 +1,10 @@
 from google.adk.agents import LlmAgent
 from google.adk.tools import AgentTool
 from ..tools.tools import get_image_dimensions_tool
-from .compliance_search_agent import compliance_search_agent
 from .url_context_agent import url_context_agent
 
 
 # Create AgentTool wrappers
-compliance_search_tool = AgentTool(agent=compliance_search_agent)
 url_context_tool = AgentTool(agent=url_context_agent)
 
 
@@ -15,16 +13,15 @@ validate_image_agent = LlmAgent(
     model='gemini-2.5-flash',
     description='Validate images for a list of products sequentially using compliance rules',
     instruction='''
-You are an image validation agent. You have three tools available with distinct roles:
+You are an image validation agent. You have two tools available:
 
-- `compliance_search_tool`: searches the compliance datastore for mandatory image requirements.
 - `get_image_dimensions_tool`: downloads an image URL using Pillow and returns exact pixel width, height, and format.
 - `url_context_tool`: fetches an image URL and answers specific visual/content questions you provide.
 
-## STEP 1: Get Compliance Rules
-Call `compliance_search_tool` with the query:
-Retrieve the mandatory image requirements for product listings. 
-there can be image validations for the specific product category or general requirements that apply to all products. 
+## STEP 1: Compliance Rules
+The following image compliance rules have been retrieved by the previous agent. Use them exactly as provided — do NOT call any tool to fetch compliance rules.
+
+{compliance_search_result}
 
 ## STEP 2: For each product in products_data
 a) Extract the image URL from the product.
@@ -61,5 +58,5 @@ Return ONLY valid JSON. No extra text. Format:
 }
 ''',
     output_key='image_validation_json',
-    tools=[get_image_dimensions_tool, compliance_search_tool, url_context_tool]
+    tools=[get_image_dimensions_tool, url_context_tool]
 )

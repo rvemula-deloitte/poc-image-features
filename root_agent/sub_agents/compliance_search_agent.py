@@ -12,7 +12,7 @@ load_dotenv()
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 
 # Vertex AI Search configuration - using the compliance datastore
-DATASTORE_ID = f"projects/{PROJECT_ID}/locations/us/collections/default_collection/dataStores/poc-policy-datastore_1772199893592"
+DATASTORE_ID = f"projects/{PROJECT_ID}/locations/us/collections/kohls-drive-connector_1773743180176/dataStores/kohls-drive-connector_1773743180176_google_drive"
 
 try:
     compliance_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_ID)
@@ -22,43 +22,35 @@ try:
         model='gemini-2.5-flash',
         description='Search compliance rules and validation requirements for product validation',
         instruction='''
-You are a Compliance Search Agent that retrieves compliance rules and validation requirements.
+You are a Compliance Search Agent that retrieves image compliance rules and validation requirements for product listings.
 
-You will receive a specific query from the calling agent. Your job is to search ONLY for what was asked — do NOT retrieve unrelated compliance topics.
+Your task is to search for ALL mandatory image requirements, including:
+- General image requirements that apply to all products
+- Category-specific image requirements
+- Image dimension, resolution, and format rules
+- Background, content, and quality guidelines
 
 Steps:
-1. Read the query provided to you carefully.
-2. Use the Vertex AI Search tool with that exact query to retrieve relevant compliance rules.
-3. Extract only the rules that directly answer the query — discard unrelated results.
+1. Use the Vertex AI Search tool with the query: "mandatory image requirements for product listings"
+2. Also search for: "image validation rules dimensions format background"
+3. Consolidate all retrieved rules, removing duplicates.
 4. Return your findings as JSON:
 
 {
-    "query": "<the search query you received>",
     "compliance_rules": [
         {
-            "rule_type": "<type of rule>",
+            "rule_type": "<type of rule, e.g. dimensions, format, background>",
             "requirement": "<specific requirement>",
-            "applies_to": "<what products this applies to>"
+            "applies_to": "<all products | specific category>"
         }
     ],
-    "summary": "<brief summary of only the rules relevant to the query>"
+    "summary": "<brief summary of the image compliance rules retrieved>"
 }
 
-Important: Do NOT search for topics that were not asked. Only return compliance rules that are directly relevant to the received query.
+Return ONLY the JSON. No extra text.
 ''',
         output_key='compliance_search_result',
-        tools=[compliance_search_tool],
-        generate_content_config=types.GenerateContentConfig(
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                maximum_remote_calls=10,
-            ),
-            tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(
-                    mode="AUTO",
-                    allowed_function_names=[compliance_search_tool.name]
-                )
-            )
-        ),
+        tools=[compliance_search_tool]
     )
 except Exception as e:
     print(f"Error initializing compliance_search_agent: {e}")
