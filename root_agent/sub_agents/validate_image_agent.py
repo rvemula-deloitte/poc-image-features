@@ -1,39 +1,124 @@
+import json
+from typing import Optional
+
 from google.adk.agents import LlmAgent
-from google.adk.tools import AgentTool
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
+from google.genai import types as genai_types
+
 from ..tools.tools import get_image_dimensions_tool
-from .url_context_agent import url_context_agent
 
 
-# Create AgentTool wrappers
-url_context_tool = AgentTool(agent=url_context_agent)
+def _detect_mime(url: str) -> str:
+    """Infer MIME type from image URL extension."""
+    lower = url.lower().split("?")[0]
+    if lower.endswith(".png"):  return "image/png"
+    if lower.endswith(".webp"): return "image/webp"
+    if lower.endswith(".gif"):  return "image/gif"
+    return "image/jpeg"
+
+
+def _extract_image_url(img_obj: dict) -> Optional[str]:
+    """Return the best available URL from a Mirakl image object."""
+    if not isinstance(img_obj, dict):
+        return None
+    # Prefer original_url (source CDN); fall back to mirakl-hosted source
+    return img_obj.get("original_url") or img_obj.get("source") or None
+
+
+def _inject_product_images(
+    callback_context: CallbackContext,
+    llm_request: LlmRequest,
+) -> Optional[LlmResponse]:
+    """
+    Before-model callback: reads all product image URLs from session state
+    and injects them as Part.from_uri directly into the Gemini request.
+
+    Handles Mirakl product JSON structure:
+      - product["mirakl_product_id"]  → product ID
+      - product["data"]["main_image"] → main image  {original_url, source}
+      - product["data"]["alt_image_1"],
+        product["data"]["alt_image_2"], ... (any number) → alternate images
+
+    Each image is preceded by a descriptive text label so the agent can
+    reference it by product ID and image type.
+    """
+    state = callback_context.state
+    raw = state.get("products_data", "[]")
+    try:
+        products = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(products, list):
+            products = [products] if isinstance(products, dict) else []
+    except Exception:
+        products = []
+
+    image_parts: list[genai_types.Part] = []
+
+    for product in products:
+        product_id = (
+            product.get("mirakl_product_id")
+            or product.get("id")
+            or "unknown"
+        )
+        data = product.get("data") or {}
+
+        # ── Main image ──────────────────────────────────────────────────────
+        main_url = _extract_image_url(data.get("main_image") or {})
+        if main_url:
+            image_parts.append(genai_types.Part(
+                text=f"[Product ID: {product_id} | image_type: main | url: {main_url}]"
+            ))
+            image_parts.append(
+                genai_types.Part.from_uri(file_uri=main_url, mime_type=_detect_mime(main_url))
+            )
+
+        # ── Alternate images: alt_image_1, alt_image_2, … (any count) ──────
+        for key in (k for k in data if k.startswith("alt_image_")):
+            alt_url = _extract_image_url(data.get(key) or {})
+            if not alt_url:
+                continue
+            image_parts.append(genai_types.Part(
+                text=f"[Product ID: {product_id} | image_type: alternate ({key}) | url: {alt_url}]"
+            ))
+            image_parts.append(
+                genai_types.Part.from_uri(file_uri=alt_url, mime_type=_detect_mime(alt_url))
+            )
+
+    if image_parts:
+        llm_request.contents.append(
+            genai_types.Content(role="user", parts=image_parts)
+        )
+
+    return None  # continue with the (now enriched) request
 
 
 validate_image_agent = LlmAgent(
     name='ImageValidatorAgent',
     model='gemini-2.5-flash',
-    description='Validate images for a list of products sequentially using compliance rules',
+    description='Validate all product images (main + alternate) directly via Gemini vision using Part.from_uri',
+    before_model_callback=_inject_product_images,
     instruction='''
-You are an image validation agent. You have two tools available:
+You are an image validation agent.
 
-- `get_image_dimensions_tool`: downloads an image URL using Pillow and returns exact pixel width, height, and format.
-- `url_context_tool`: fetches an image URL and answers specific visual/content questions you provide.
+The product images have been injected directly into this conversation as inline image parts.
+Each image is preceded by a text label: [Product ID: <id> | image_type: main|alternate | url: <url>]
 
-## STEP 1: Compliance Rules
-The following image compliance rules have been retrieved by the previous agent. Use them exactly as provided — do NOT call any tool to fetch compliance rules.
+## STEP 1 — Compliance Rules (already in state)
+Use the compliance rules exactly as provided — do NOT call any tool to re-fetch them.
 
 {compliance_search_result}
 
-## STEP 2: For each product in products_data
-a) Extract the image URL from the product.
-b) Call `get_image_dimensions_tool` with the URL to get exact pixel dimensions.
-c) Call `url_context_tool` with the URL and a query built from the compliance rules retrieved in Step 1 
-Note: 'url_context_tool' cannot directly check compliance or dimensions of the image, but you can ask it to fetch specific attributes or 
-observations about the image that are relevant to the compliance rules.
-   (e.g. "Does this image meet the following requirements: <list rules>?").
+## STEP 2 — Dimensions
+For every image URL labelled above, call `get_image_dimensions_tool` with that URL
+to get exact pixel width, height, and format.
 
-## STEP 3: Verify Compliance
-For each product, combine the results from Steps 2b and 2c and compare against the compliance rules from Step 1.
-Determine pass/fail for each product.
+## STEP 3 — Visual Compliance Check
+For each injected image, visually inspect it against every compliance rule from Step 1.
+You can see the actual image — assess background colour, centring, clutter, watermarks,
+resolution appearance, and any other visual rules directly.
+
+## STEP 4 — Return aggregated results
 
 Return ONLY valid JSON. No extra text. Format:
 {
@@ -41,22 +126,27 @@ Return ONLY valid JSON. No extra text. Format:
         {
             "product_id": "...",
             "image_url": "...",
+            "image_type": "main",
             "width": 1920,
             "height": 1080,
             "format": "JPEG",
             "compliant": true,
-            "details": "...",
-            "message": "..."
+            "compliance_score": 92,
+            "rule_results": [
+                {"rule": "...", "passed": true, "observation": "..."}
+            ],
+            "issues": [],
+            "details": "..."
         }
     ],
     "summary": {
-        "total": 1,
-        "compliant": 1,
-        "non_compliant": 0
+        "total": 3,
+        "compliant": 2,
+        "non_compliant": 1
     },
-    "compliance_rules_applied": [rules that were actually applied in the validation]
+    "compliance_rules_applied": ["..."]
 }
 ''',
     output_key='image_validation_json',
-    tools=[get_image_dimensions_tool, url_context_tool]
+    tools=[get_image_dimensions_tool],
 )

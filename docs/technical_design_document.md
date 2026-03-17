@@ -2,7 +2,7 @@
 ## Product Validation Pipeline — POC Image Features
 
 **Version:** 1.0  
-**Date:** March 11, 2026  
+**Date:** March 17, 2026  
 **Framework:** Google Agent Development Kit (ADK)  
 
 ---
@@ -14,10 +14,13 @@
 3. [Active Pipeline Execution Flow](#3-active-pipeline-execution-flow)
 4. [Agent Deep-Dive](#4-agent-deep-dive)
    - 4.1 [Root Agent — `product_validation_pipeline`](#41-root-agent--product_validation_pipeline)
-   - 4.2 [Image Validator Agent — `ImageValidatorAgent`](#42-image-validator-agent--imagevalidatoragent)
-   - 4.3 [Compliance Search Agent — `ComplianceSearchAgent`](#43-compliance-search-agent--compliancesearchagent)
-   - 4.4 [URL Context Agent — `UrlContextAgent`](#44-url-context-agent--urlcontextagent)
-   - 4.5 [Validate and Score Agent — `ValidateAndScoreAgent`](#45-validate-and-score-agent--validateandscoreeagent)
+   - 4.2 [Compliance Search Agent — `ComplianceSearchAgent`](#42-compliance-search-agent--compliancesearchagent)
+   - 4.3 [Legal Agent — `LegalAgent`](#43-legal-agent--legalagent)
+   - 4.4 [Validation Group — `ParallelAgent`](#44-validation-group--parallelagent)
+   - 4.5 [Image Validator Agent — `ImageValidatorAgent`](#45-image-validator-agent--imagevalidatoragent)
+   - 4.6 [Attribute Validation Agent — `AttributeValidationAgent`](#46-attribute-validation-agent--attributevalidationagent)
+   - 4.7 [Legal Validation Agent — `LegalValidationAgent`](#47-legal-validation-agent--legalvalidationagent)
+   - 4.8 [Score Agent — `ScoreAgent`](#48-score-agent--scoreagent)
 5. [Tools Reference](#5-tools-reference)
 6. [Data Models](#6-data-models)
 7. [Compliance Rules](#7-compliance-rules)
@@ -37,9 +40,12 @@ The pipeline operates **sequentially** — each agent produces output that is st
 
 | Goal | Mechanism |
 |------|-----------|
-| Validate product images (dimension, quality, content) | `ImageValidatorAgent` + tools |
-| Enforce attribute completeness per product type | `ValidateAndScoreAgent` + Vertex AI Search |
-| Score each product's reliability (0–100) | LLM reasoning in `ValidateAndScoreAgent` |
+| Centralise compliance rule retrieval | `ComplianceSearchAgent` (Step 1) — Vertex AI Search |
+| Enrich compliance rules with live legal data | `LegalAgent` (Step 2) — fetches rules from web URLs, merges into `compliance_rules` |
+| Validate product images (dimension, quality, content) | `ImageValidatorAgent` (Step 3 — parallel) + `get_image_dimensions_tool` + Gemini vision |
+| Enforce attribute completeness per product type | `AttributeValidationAgent` (Step 3 — parallel) + Vertex AI Search |
+| Validate products against legal requirements | `LegalValidationAgent` (Step 3 — parallel) |
+| Score each product's reliability (0–100) | `ScoreAgent` (Step 4) — LLM reasoning over all validation results |
 | Surface actionable issues per product | Structured JSON output at every stage |
 
 ---
@@ -49,26 +55,32 @@ The pipeline operates **sequentially** — each agent produces output that is st
 ### Agent Hierarchy
 
 ```
-product_validation_pipeline   (SequentialAgent — root)
-├── ImageValidatorAgent        (LlmAgent — Step 1)
-│   ├── ComplianceSearchAgent  (LlmAgent — wrapped as AgentTool)
-│   │   └── VertexAiSearchTool (GCP Vertex AI Search)
-│   ├── get_image_dimensions_tool (FunctionTool — Pillow/requests)
-│   └── UrlContextAgent        (LlmAgent — wrapped as AgentTool)
-│       └── url_context        (Built-in ADK tool)
-└── ValidateAndScoreAgent      (LlmAgent — Step 2)
-    └── VertexAiSearchTool     (GCP Vertex AI Search — direct)
+product_validation_pipeline           (SequentialAgent — root)
+├── ComplianceSearchAgent             (LlmAgent — Step 1)
+│   └── VertexAiSearchTool            (GCP Vertex AI Search)
+├── LegalAgent                        (LlmAgent — Step 2)
+│   └── url_context / web fetch tool  (fetches rules from web URLs)
+├── validation_group                  (ParallelAgent — Step 3)
+│   ├── ImageValidatorAgent           (LlmAgent — parallel branch A)
+│   │   └── get_image_dimensions_tool (FunctionTool — Pillow/requests)
+│   ├── AttributeValidationAgent      (LlmAgent — parallel branch B)
+│   │   └── VertexAiSearchTool        (GCP Vertex AI Search)
+│   └── LegalValidationAgent          (LlmAgent — parallel branch C)
+└── ScoreAgent                        (LlmAgent — Step 4)
 ```
 
 ### Component Map
 
 | Component | Type | File | Responsibility |
 |-----------|------|------|----------------|
-| `product_validation_pipeline` | `SequentialAgent` | `root_agent/root_agent.py` | Orchestrates all sub-agents in order |
-| `ImageValidatorAgent` | `LlmAgent` | `sub_agents/validate_image_agent.py` | Validates product images |
-| `ComplianceSearchAgent` | `LlmAgent` | `sub_agents/compliance_search_agent.py` | Retrieves image compliance rules |
-| `UrlContextAgent` | `LlmAgent` | `sub_agents/url_context_agent.py` | Visual image analysis from URL |
-| `ValidateAndScoreAgent` | `LlmAgent` | `sub_agents/validate_attribute_agent.py` | Attribute validation + confidence scoring |
+| `product_validation_pipeline` | `SequentialAgent` | `root_agent/agent.py` | Orchestrates all sub-agents in order |
+| `ComplianceSearchAgent` | `LlmAgent` | `sub_agents/compliance_search_agent.py` | Fetches image + attribute compliance rules from Vertex AI Search; writes `compliance_rules` |
+| `LegalAgent` | `LlmAgent` | `sub_agents/legal_agent.py` | Fetches legal rules from web URLs; merges them into `compliance_rules` |
+| `validation_group` | `ParallelAgent` | `root_agent/agent.py` | Runs all three validation agents simultaneously |
+| `ImageValidatorAgent` | `LlmAgent` | `sub_agents/validate_image_agent.py` | Validates product images using Gemini vision + dimension check |
+| `AttributeValidationAgent` | `LlmAgent` | `sub_agents/validate_attribute_agent.py` | Validates product attributes against compliance rules from Vertex AI Search |
+| `LegalValidationAgent` | `LlmAgent` | `sub_agents/legal_validation_agent.py` | Validates products against legal compliance requirements |
+| `ScoreAgent` | `LlmAgent` | `sub_agents/confidence_score_agent.py` | Combines all three validation results into a final per-product confidence score |
 | `get_image_dimensions_tool` | `FunctionTool` | `tools/tools.py` | Downloads image; returns pixel dimensions |
 | `fetch_products_tool` | `FunctionTool` | `tools/tools.py` | Fetches products from Mirakl API |
 | `bigquery_write_tool` | `FunctionTool` | `tools/bigquery_tool.py` | Writes results to BigQuery |
@@ -86,17 +98,35 @@ Caller submits query
        ▼
 [SequentialAgent] product_validation_pipeline
        │
-       ├─── Step 1 ──► ImageValidatorAgent
-       │                    reads:  products_data (session state)
-       │                    writes: image_validation_json (session state)
+       ├─── Step 1 ──► ComplianceSearchAgent
+       │                    reads:  (none — queries Vertex AI Search directly)
+       │                    writes: compliance_rules (session state)
        │
-       └─── Step 2 ──► ValidateAndScoreAgent
-                            reads:  products_data (session state)
-                                    image_validation_json (session state)
+       ├─── Step 2 ──► LegalAgent
+       │                    reads:  compliance_rules (session state)
+       │                    writes: compliance_rules (session state, enriched with legal rules)
+       │
+       ├─── Step 3 ──► validation_group  [ParallelAgent]
+       │                    ├── ImageValidatorAgent
+       │                    │       reads:  products_data, compliance_rules
+       │                    │       writes: image_validation_json
+       │                    │
+       │                    ├── AttributeValidationAgent
+       │                    │       reads:  products_data, compliance_rules
+       │                    │       writes: attribute_validation_json
+       │                    │
+       │                    └── LegalValidationAgent
+       │                            reads:  products_data, compliance_rules
+       │                            writes: legal_validation_json
+       │
+       └─── Step 4 ──► ScoreAgent
+                            reads:  image_validation_json (session state)
+                                    attribute_validation_json (session state)
+                                    legal_validation_json (session state)
                             writes: validation_and_score_json (session state)
 ```
 
-The `SequentialAgent` guarantees that Step 2 never starts before Step 1 has completed and written its output key to session state.
+The `SequentialAgent` guarantees strict ordering across the four steps. Within Step 3, the `ParallelAgent` runs all three validation agents simultaneously — each writes to a distinct session state key, so there is no conflict.
 
 ---
 
@@ -105,64 +135,164 @@ The `SequentialAgent` guarantees that Step 2 never starts before Step 1 has comp
 ### 4.1 Root Agent — `product_validation_pipeline`
 
 **Type:** `SequentialAgent`  
-**File:** [root_agent/root_agent.py](../root_agent/root_agent.py)
+**File:** [root_agent/agent.py](../root_agent/agent.py)
 
 The root agent is a pure orchestrator. It holds no LLM model of its own and executes no tool calls. Its only responsibility is to invoke its `sub_agents` list in declaration order, passing the shared session state between them.
 
 **Behaviour when a query arrives:**
 
 1. The user (or calling application) submits a natural-language query along with session state that contains `products_data`.
-2. The `SequentialAgent` invokes `ImageValidatorAgent`, blocking until it completes.
-3. Once `ImageValidatorAgent` writes `image_validation_json` to session state, the `SequentialAgent` invokes `ValidateAndScoreAgent`.
-4. After `ValidateAndScoreAgent` writes `validation_and_score_json`, the pipeline terminates and the final session state is returned to the caller.
+2. The `SequentialAgent` invokes `ComplianceSearchAgent` (Step 1), blocking until it writes `compliance_rules` to session state.
+3. `LegalAgent` (Step 2) then runs — it reads the existing `compliance_rules`, fetches additional legal rules from web URLs, and writes the merged result back to `compliance_rules`.
+4. The `ParallelAgent` (`validation_group`, Step 3) launches `ImageValidatorAgent`, `AttributeValidationAgent`, and `LegalValidationAgent` concurrently. All three read `compliance_rules` and write to their respective output keys.
+5. Once all three parallel branches complete, `ScoreAgent` (Step 4) reads all three validation results and writes `validation_and_score_json`. The pipeline then terminates and the final session state is returned to the caller.
 
 ---
 
-### 4.2 Image Validator Agent — `ImageValidatorAgent`
+### 4.2 Compliance Search Agent — `ComplianceSearchAgent`
+
+**Type:** `LlmAgent`  
+**Model:** `gemini-2.5-flash`  
+**File:** [sub_agents/compliance_search_agent.py](../sub_agents/compliance_search_agent.py)  
+**Output key:** `compliance_rules`  
+**Tools available:** `VertexAiSearchTool` (datastore: `poc-policy-datastore`)
+
+#### Role in the pipeline
+
+`ComplianceSearchAgent` is the **first step** in the `SequentialAgent`. It runs before any validation and its output (`compliance_rules`) is consumed by all downstream agents, giving the pipeline a single authoritative source of truth for compliance requirements.
+
+#### Step-by-step execution
+
+1. Issues two searches against the `poc-policy-datastore` Vertex AI Search datastore:
+   - `"mandatory image requirements for product listings"`
+   - `"image validation rules dimensions format background"`
+2. Consolidates all retrieved rules, removing duplicates.
+3. Writes structured JSON to the `compliance_rules` session state key:
+
+```json
+{
+  "compliance_rules": [
+    {
+      "rule_type": "dimensions",
+      "requirement": "Minimum 1920×1080 pixels",
+      "applies_to": "all products"
+    },
+    {
+      "rule_type": "background",
+      "requirement": "White or neutral background required",
+      "applies_to": "all products"
+    }
+  ],
+  "summary": "All product images must be Full HD (1920×1080) minimum, sharp, and show the product as dominant."
+}
+```
+
+---
+
+### 4.3 Legal Agent — `LegalAgent`
+
+#### Role in the pipeline
+
+`LegalAgent` is the **second step** in the `SequentialAgent`. It runs immediately after `ComplianceSearchAgent` and enriches the shared `compliance_rules` state key by appending legal and regulatory rules fetched from authoritative web URLs. The merged result is written back to `compliance_rules` in the same JSON schema, giving all downstream validation agents a single, unified rules object that covers both internal policy and external legal requirements.
+
+#### Step-by-step execution
+
+1. Reads the current `compliance_rules` from session state (written by `ComplianceSearchAgent`).
+2. Fetches legal requirement documents from the configured web URLs using the web fetch tool.
+3. Extracts applicable rules from the fetched content and normalises them into the same `compliance_rules` JSON schema:
+
+```json
+{
+  "rule_type": "legal",
+  "requirement": "<extracted legal requirement>",
+  "applies_to": "<all products | specific category>",
+  "source_url": "<origin URL>"
+}
+```
+
+4. Merges the newly extracted rules into the existing rules list, removing duplicates.
+5. Writes the enriched object back to `compliance_rules` in session state:
+
+```json
+{
+  "compliance_rules": [
+    {
+      "rule_type": "dimensions",
+      "requirement": "Minimum 1920×1080 pixels",
+      "applies_to": "all products"
+    },
+    {
+      "rule_type": "legal",
+      "requirement": "Product must comply with applicable consumer safety regulations",
+      "applies_to": "all products",
+      "source_url": "https://..."
+    }
+  ],
+  "summary": "Consolidated compliance and legal rules for product validation."
+}
+```
+
+---
+
+### 4.4 Validation Group — `ParallelAgent`
+
+**Type:** `ParallelAgent`  
+**File:** [root_agent/agent.py](../root_agent/agent.py)  
+**Sub-agents:** `ImageValidatorAgent`, `AttributeValidationAgent`, `LegalValidationAgent(If Needed)`
+
+#### Role in the pipeline
+
+The `validation_group` is the **third step** in the root `SequentialAgent`. It wraps all three validation agents in an ADK `ParallelAgent`, meaning they are dispatched concurrently and run simultaneously. Each agent reads from shared session state (which is safe because they only read `products_data` and `compliance_rules`, not write to each other's keys) and writes to its own distinct output key. The `ParallelAgent` completes only when all three branches have finished.
+
+| Branch | Agent | Output key |
+|--------|-------|------------|
+| A | `ImageValidatorAgent` | `image_validation_json` |
+| B | `AttributeValidationAgent` | `attribute_validation_json` |
+| C | `LegalValidationAgent` | `legal_validation_json` |
+
+---
+
+### 4.5 Image Validator Agent — `ImageValidatorAgent`
 
 **Type:** `LlmAgent`  
 **Model:** `gemini-2.5-flash`  
 **File:** [sub_agents/validate_image_agent.py](../sub_agents/validate_image_agent.py)  
 **Output key:** `image_validation_json`  
-**Tools available:** `compliance_search_tool`, `get_image_dimensions_tool`, `url_context_tool`
+**Tools available:** `get_image_dimensions_tool`
 
 #### What it does
 
-This agent validates all product images in `products_data` against the compliance rules stored in Vertex AI Search. It checks both quantitative metrics (pixel dimensions) and qualitative visual attributes (background, product placement, blur).
+This agent validates all product images in `products_data` against the compliance rules already present in session state as `compliance_rules`. It checks both quantitative metrics (pixel dimensions) and qualitative visual attributes using Gemini's native vision capability — product images are injected directly into the Gemini request as inline `Part.from_uri` parts via a `before_model_callback`.
 
 #### Step-by-step execution
 
-**Step 1 — Retrieve compliance rules**
+**Step 1 — Image injection (before_model_callback)**
 
-The agent calls `compliance_search_tool` (which is `ComplianceSearchAgent` wrapped as an `AgentTool`) with the query:
+Before the LLM request is sent, the `_inject_product_images` callback reads every product in `products_data` from session state and injects their image URLs (main + all alternate images) as `Part.from_uri` parts directly into the Gemini request. Each image part is preceded by a descriptive text label:
 
-> *"Retrieve the mandatory image requirements for product listings."*
+```
+[Product ID: abc-123 | image_type: main | url: https://...]
+```
 
-`ComplianceSearchAgent` searches the Vertex AI Search datastore (`poc-policy-datastore`) and returns a structured JSON listing all image compliance rules, e.g.:
-- Minimum resolution: 1920×1080 pixels
-- Product must be the dominant object
-- Background must be appropriate
-- Image must not be blurred
-- Product title and description must match the image contents
+This means the agent can **see** the actual images rather than relying on an external analysis tool.
 
-**Step 2 — Per-product image processing**
+**Step 2 — Read compliance rules (from session state)**
 
-For each product in `products_data`, the agent:
+The agent reads `{compliance_rules}` directly from the session state — no additional tool call is needed. By the time `ImageValidatorAgent` runs, `compliance_rules` has been written by `ComplianceSearchAgent` and further enriched by `LegalAgent`.
 
-a. **Extracts the image URL** from the product's `images` array.
+**Step 3 — Dimension check**
 
-b. **Calls `get_image_dimensions_tool`** with the URL.  
-   - This tool uses the Python `requests` library to download the image and `Pillow` to open it.
-   - Returns: `{ url, width, height, format }` or an error object if the download fails.
-   - Example result: `{ "url": "https://...", "width": 2048, "height": 1536, "format": "JPEG" }`
+For every image URL visible in the conversation, the agent calls `get_image_dimensions_tool` with that URL.  
+- The tool downloads the image using `requests` and opens it with `Pillow`.  
+- Returns: `{ url, width, height, format }` or an error dict if the download fails.
 
-c. **Calls `url_context_tool`** (which is `UrlContextAgent` wrapped as an `AgentTool`) with the URL and a compliance-derived query built from the rules retrieved in Step 1.  
-   - Example query: *"Does this image have a white/neutral background? Is the product the dominant object? Is the image sharp and not blurred?"*
-   - `UrlContextAgent` uses the built-in ADK `url_context` tool to fetch and visually analyze the image, then returns a structured JSON of its findings.
+**Step 4 — Visual compliance check**
 
-**Step 3 — Compliance verification and result assembly**
+Using the injected image parts, the agent visually inspects each image against every compliance rule from Step 2 — assessing background colour, product centring, clutter, watermarks, sharpness, and any other visual rules directly from the image content.
 
-For each product, the agent combines the pixel dimension result (Step 2b) and the visual analysis result (Step 2c) and compares them against the compliance rules (Step 1). It derives a `compliant: true/false` determination for each product.
+**Step 5 — Result assembly**
+
+Combines the pixel dimension result (Step 3) and the visual inspection (Step 4) against the compliance rules. Derives a per-image `compliant: true/false` flag and a `compliance_score`.
 
 **Output written to session state (`image_validation_json`):**
 
@@ -172,12 +302,18 @@ For each product, the agent combines the pixel dimension result (Step 2b) and th
     {
       "product_id": "abc-123",
       "image_url": "https://...",
+      "image_type": "main",
       "width": 2048,
       "height": 1536,
       "format": "JPEG",
       "compliant": true,
-      "details": "Image passes dimension check (2048×1536 ≥ 1920×1080). Background is white. Product is dominant.",
-      "message": "PASS"
+      "compliance_score": 92,
+      "rule_results": [
+        { "rule": "min_resolution_1920x1080", "passed": true, "observation": "2048×1536 exceeds minimum" },
+        { "rule": "white_background", "passed": true, "observation": "Clean white background observed" }
+      ],
+      "issues": [],
+      "details": "Image passes all compliance checks."
     }
   ],
   "summary": {
@@ -191,129 +327,104 @@ For each product, the agent combines the pixel dimension result (Step 2b) and th
 
 ---
 
-### 4.3 Compliance Search Agent — `ComplianceSearchAgent`
-
-**Type:** `LlmAgent`  
-**Model:** `gemini-2.5-flash`  
-**File:** [sub_agents/compliance_search_agent.py](../sub_agents/compliance_search_agent.py)  
-**Output key:** `compliance_search_result`  
-**Tools available:** `VertexAiSearchTool` (datastore: `poc-policy-datastore`)
-
-#### Role in the pipeline
-
-This agent is **not a direct sub-agent of the root pipeline**. It is invoked as an `AgentTool` by `ImageValidatorAgent`. It is a specialised search assistant whose sole job is to look up compliance rules for the exact query it receives.
-
-#### Step-by-step execution
-
-1. Receives a focused query from `ImageValidatorAgent` (e.g., *"mandatory image requirements for product listings"*).
-2. Calls `VertexAiSearchTool` with that query against the `poc-policy-datastore` Vertex AI Search datastore.
-3. Filters results to return only rules directly relevant to the query — discarding unrelated compliance topics.
-4. Returns structured JSON:
-
-```json
-{
-  "query": "mandatory image requirements for product listings",
-  "compliance_rules": [
-    {
-      "rule_type": "image_resolution",
-      "requirement": "Minimum 1920×1080 pixels",
-      "applies_to": "all products"
-    },
-    {
-      "rule_type": "image_quality",
-      "requirement": "Image must not be blurred",
-      "applies_to": "all products"
-    }
-  ],
-  "summary": "All product images must be Full HD (1920×1080) minimum, sharp, and show the product as dominant."
-}
-```
-
-**Maximum remote tool calls:** 10 (configured via `AutomaticFunctionCallingConfig`)
-
----
-
-### 4.4 URL Context Agent — `UrlContextAgent`
-
-**Type:** `LlmAgent`  
-**Model:** `gemini-2.5-flash`  
-**File:** [sub_agents/url_context_agent.py](../sub_agents/url_context_agent.py)  
-**Output key:** `url_context_result`  
-**Tools available:** `url_context` (built-in ADK tool)
-
-#### Role in the pipeline
-
-Also invoked as an `AgentTool` by `ImageValidatorAgent`. It performs visual/qualitative analysis of a product image — answering specific questions that pixel-dimension checks cannot answer (e.g., *"Is the background neutral? Is the product centred?"*).
-
-#### Step-by-step execution
-
-1. Receives an image URL and a specific query from `ImageValidatorAgent`.
-2. Uses the built-in ADK `url_context` tool to load the image from the URL.
-3. Answers only what the query asks — does not produce unsolicited analysis.
-4. Returns structured JSON:
-
-```json
-{
-  "url": "https://example.com/product.jpg",
-  "query": "Does this image have a white background? Is the product the dominant object?",
-  "findings": {
-    "white_background": true,
-    "product_dominant": true,
-    "sharp": true
-  },
-  "summary": "Image has a white background, product is centred and dominant, no blurring detected."
-}
-```
-
-**Important constraint:** This agent reports only what it can directly observe. It does not hallucinate pixel values — those come exclusively from `get_image_dimensions_tool`.
-
----
-
-### 4.5 Validate and Score Agent — `ValidateAndScoreAgent`
+### 4.6 Attribute Validation Agent — `AttributeValidationAgent`
 
 **Type:** `LlmAgent`  
 **Model:** `gemini-2.5-flash`  
 **File:** [sub_agents/validate_attribute_agent.py](../sub_agents/validate_attribute_agent.py)  
-**Output key:** `validation_and_score_json`  
-**Tools available:** `VertexAiSearchTool` (direct, same datastore)
+**Output key:** `attribute_validation_json`  
+**Tools available:** `VertexAiSearchTool` (direct, same datastore as `ComplianceSearchAgent`)
 
 #### What it does
 
-This agent combines three information sources — compliance rules (from Vertex AI Search), image validation results (from session state), and product attribute data — to produce a **per-product confidence score from 0–100** and a **confidence level** (High / Good / Medium / Low), along with itemised issues.
+This agent runs as **parallel branch B** inside the `validation_group`. It validates product attribute completeness and quality against the compliance rules stored in Vertex AI Search. It focuses exclusively on attribute data — scoring is handled separately by `ScoreAgent`.
 
 #### Step-by-step execution
 
 **Step 1 — Retrieve attribute compliance rules**
 
-The agent issues targeted searches against the Vertex AI Search datastore:
+Issues targeted searches against the `poc-policy-datastore`:
 
-- Search 1: `"common required attributes"` — retrieves the universal required fields (`brand`, `title`, `product_category`, `main_image`).
-- Search 2: `"required attributes for product type <product_type>"` — retrieves the type-specific required fields (e.g., `care`, `origin`, `fabric_material`, `color_family`, etc. for type `5_8_1_99999_125_1035`).
-- Search 3: `"image validation requirements"` — retrieves image compliance rules for cross-referencing.
+- Search 1: `"common required attributes"` — retrieves universal required fields (`brand`, `title`, `product_category`, `main_image`).
+- Search 2: `"required attributes for product type <product_type>"` — retrieves type-specific required fields.
 
-**Maximum remote calls:** 15 (configured via `AutomaticFunctionCallingConfig`)
+**Step 2 — Per-product attribute check**
 
-**Step 2 — Multi-factor scoring for each product**
+For each product in `products_data`, evaluates:
+- Are all required common attributes present and non-empty?
+- Are all type-specific required attributes present and non-empty?
+- Are there null values or empty strings in required fields?
 
-For each product, the agent evaluates three dimensions:
+**Output written to session state (`attribute_validation_json`):**
+
+```json
+{
+  "results": [
+    {
+      "mirakl_product_id": "abc-123",
+      "product_sku": "4135850671899",
+      "product_type": "5_8_1_99999_125_1035",
+      "common_attributes_valid": true,
+      "type_specific_attributes_valid": false,
+      "missing_attributes": ["care", "choking_hazard"],
+      "empty_attributes": [],
+      "issues": [
+        "Missing required attribute: 'care'",
+        "Missing required attribute: 'choking_hazard'"
+      ]
+    }
+  ],
+  "summary": {
+    "total_products": 1,
+    "fully_valid": 0,
+    "has_issues": 1
+  }
+}
+```
+
+---
+
+### 4.5 Score Agent — `ScoreAgent`
+
+**Type:** `LlmAgent`  
+**Model:** `gemini-2.5-flash`  
+**File:** [sub_agents/confidence_score_agent.py](../sub_agents/confidence_score_agent.py)  
+**Output key:** `validation_and_score_json`  
+**Tools available:** none
+
+#### What it does
+
+`ScoreAgent` is the **final step** in the pipeline. It reads `image_validation_json` and `attribute_validation_json` from session state and combines them into a **per-product confidence score (0–100)** with a **confidence level** (High / Good / Medium / Low) and itemised `ai_comments`.
+
+#### Step-by-step execution
+
+**Step 1 — Read prior validation results**
+
+Reads directly from session state:
+- `image_validation_json` — per-image compliance results from `ImageValidatorAgent`
+- `attribute_validation_json` — per-product attribute results from `AttributeValidationAgent`
+
+**Step 2 — Multi-factor scoring**
+
+For each product, evaluates three dimensions:
 
 | Dimension | What is checked |
 |-----------|-----------------|
-| **Compliance rules** | Are required common and type-specific attributes present and non-empty? |
-| **Image validation** | Did `image_validation_json` mark this product's image as `compliant: true`? |
-| **Data quality** | Are there missing fields, null values, or empty strings in required attributes? |
+| **Image compliance** | Did `image_validation_json` mark this product's images as `compliant: true`? What is the `compliance_score`? |
+| **Attribute completeness** | Did `attribute_validation_json` find any missing or empty required attributes? |
+| **Data quality** | Are there null values, empty strings, or structural issues in the product data? |
 
 **Step 3 — Score assignment**
 
-Based on the combined assessment, the LLM assigns:
+The LLM assigns:
 
 - A **numeric confidence score** (0–100)
 - A **confidence level** derived from the score:
-  - **High:** 80–100 — All attributes present, image compliant, no issues
-  - **Good:** 60–79 — Minor issues (1–2 non-critical missing attributes)
-  - **Medium:** 40–59 — Several missing attributes or image non-compliant
-  - **Low:** 0–39 — Critical failures (missing mandatory attributes, image failed)
-- `ai_comments`: A detailed, point-by-point explanation of every issue found
+  - **High:** 80–100 — All attributes present, image compliant, no legal violations, no issues
+  - **Good:** 60–79 — Minor issues (1–2 non-critical missing attributes or minor image issues)
+  - **Medium:** 40–59 — Several missing attributes, image non-compliant, or minor legal issues
+  - **Low:** 0–39 — Critical failures (missing mandatory attributes, image failed, or legal violations)
+- `ai_comments`: Point-by-point explanation of every issue found across all validation dimensions
 
 **Output written to session state (`validation_and_score_json`):**
 
@@ -324,7 +435,7 @@ Based on the combined assessment, the LLM assigns:
       "mirakl_product_id": "abc-123",
       "product_sku": "4135850671899",
       "confidence_score": 72,
-      "ai_comments": "1. Missing attribute: 'care' (required for product type 5_8_1_99999_125_1035). 2. Missing attribute: 'choking_hazard'. 3. Image validated as compliant (2048×1536, white background, product dominant). 4. Common attributes (brand, title, product_category, main_image) all present."
+      "ai_comments": "1. Missing attribute: 'care' (required for product type 5_8_1_99999_125_1035). 2. Missing attribute: 'choking_hazard'. 3. Image validated as compliant (2048×1536, white background, product dominant). 4. Common attributes (brand, title, product_category, main_image) all present. 5. No legal compliance violations found."
     }
   ],
   "summary": {
@@ -465,64 +576,85 @@ flowchart TD
     subgraph ROOT["🔗 SequentialAgent: product_validation_pipeline"]
         direction TB
 
-        subgraph STEP1["Step 1 — ImageValidatorAgent (gemini-2.5-flash)"]
+        subgraph STEP1["Step 1 — ComplianceSearchAgent (gemini-2.5-flash)"]
             direction TB
-            B[Read products_data\nfrom session state]
-            B --> C[Call ComplianceSearchAgent\nQuery: mandatory image requirements]
-
-            subgraph CSA["ComplianceSearchAgent (AgentTool)"]
-                C1[VertexAiSearchTool\n→ poc-policy-datastore]
-                C2[Filter & return\ncompliance rules JSON]
-                C1 --> C2
-            end
-            C --> C1
-            C2 --> D
-
-            D[For each product:\nExtract image URL]
-            D --> E[Call get_image_dimensions_tool\n→ Download with requests\n→ Open with Pillow\n→ Return width, height, format]
-            E --> F[Call UrlContextAgent\nQuery: visual compliance questions]
-
-            subgraph UCA["UrlContextAgent (AgentTool)"]
-                U1[url_context tool\n→ Fetch image from URL]
-                U2[LLM answers visual\ncompliance questions]
-                U1 --> U2
-            end
-            F --> U1
-            U2 --> G
-
-            G[Combine dimensions + visual analysis\nvs. compliance rules]
-            G --> H{Compliant?}
-            H -->|Yes| I1[compliant: true]
-            H -->|No| I2[compliant: false\n+ reason]
-            I1 --> J
-            I2 --> J
-            J([Write image_validation_json\nto session state])
+            B[Search 1: mandatory image requirements\nVertexAiSearchTool → poc-policy-datastore]
+            B --> B2[Search 2: image validation rules\ndimensions format background]
+            B2 --> B3[Consolidate & deduplicate rules]
+            B3 --> B4([Write compliance_rules\nto session state])
         end
 
-        subgraph STEP2["Step 2 — ValidateAndScoreAgent (gemini-2.5-flash)"]
+        subgraph STEP2["Step 2 — LegalAgent (gemini-2.5-flash)"]
             direction TB
-            K[Read products_data\nfrom session state]
-            K --> L[Read image_validation_json\nfrom session state]
-            L --> M[Search 1: common required attributes\nVertexAiSearchTool]
-            M --> N[Search 2: required attributes\nfor product_type\nVertexAiSearchTool]
-            N --> O[Search 3: image validation requirements\nVertexAiSearchTool]
-            O --> P[For each product:\nCheck common attributes present & non-empty]
-            P --> Q[Check type-specific\nattributes present & non-empty]
-            Q --> R[Cross-reference image_validation_json\nfor this product]
-            R --> S[LLM scores all three dimensions\nand assigns confidence score 0–100]
-            S --> T([Write validation_and_score_json\nto session state])
+            LA1[Read compliance_rules\nfrom session state]
+            LA1 --> LA2[Fetch legal requirement documents\nfrom configured web URLs]
+            LA2 --> LA3[Extract & normalise rules\ninto compliance_rules schema]
+            LA3 --> LA4[Merge with existing rules\nremove duplicates]
+            LA4 --> LA5([Write enriched compliance_rules\nback to session state])
         end
 
-        J --> K
+        subgraph STEP3["Step 3 — validation_group (ParallelAgent)"]
+            direction LR
+
+            subgraph BRANCH_A["Branch A — ImageValidatorAgent"]
+                direction TB
+                C[before_model_callback:\nInject product image URLs\nas Part.from_uri]
+                C --> D[Read compliance_rules]
+                D --> E[Call get_image_dimensions_tool]
+                E --> F[Visually inspect images\nvs. compliance rules]
+                F --> G{Compliant?}
+                G -->|Yes| I1[compliant: true]
+                G -->|No| I2[compliant: false + issues]
+                I1 --> J([Write image_validation_json])
+                I2 --> J
+            end
+
+            subgraph BRANCH_B["Branch B — AttributeValidationAgent"]
+                direction TB
+                K[Read compliance_rules]
+                K --> L[Search: common required attributes\nVertexAiSearchTool]
+                L --> M[Search: type-specific attributes\nVertexAiSearchTool]
+                M --> N[Check attributes\npresent & non-empty]
+                N --> P([Write attribute_validation_json])
+            end
+
+            subgraph BRANCH_C["Branch C — LegalValidationAgent(Implement if Needed)"]
+                direction TB
+                LV1[Read compliance_rules\nfilter legal rules]
+                LV1 --> LV2[For each product:\ncheck against legal rules]
+                LV2 --> LV3([Write legal_validation_json])
+            end
+        end
+
+        subgraph STEP4["Step 4 — ScoreAgent (gemini-2.5-flash)"]
+            direction TB
+            Q[Read image_validation_json]
+            Q --> R[Read attribute_validation_json]
+            R --> R2[Read legal_validation_json]
+            R2 --> S[Score each product across\n4 dimensions:\nImage · Attributes · Legal · Data quality]
+            S --> T[Assign confidence_score 0–100\nHigh · Good · Medium · Low]
+            T --> U([Write validation_and_score_json\nto session state])
+        end
+
+        B4 --> LA1
+        LA5 --> C
+        LA5 --> K
+        LA5 --> LV1
+        J --> Q
+        P --> Q
+        LV3 --> Q
     end
 
-    T --> Z([**Final Session State**\ncontains image_validation_json\n+ validation_and_score_json])
+    U --> Z([**Final Session State**\ncontains compliance_rules\n+ image_validation_json\n+ attribute_validation_json\n+ legal_validation_json\n+ validation_and_score_json])
 
     style ROOT fill:#f0f4ff,stroke:#4a6fa5,stroke-width:2px
-    style STEP1 fill:#e8f4e8,stroke:#2d7a2d,stroke-width:1.5px
-    style STEP2 fill:#fff4e8,stroke:#c47a00,stroke-width:1.5px
-    style CSA fill:#e0f0ff,stroke:#2060c0,stroke-width:1px
-    style UCA fill:#e0f0ff,stroke:#2060c0,stroke-width:1px
+    style STEP1 fill:#fdf0ff,stroke:#8844cc,stroke-width:1.5px
+    style STEP2 fill:#fff0e8,stroke:#b85c00,stroke-width:1.5px
+    style STEP3 fill:#f0fff0,stroke:#228822,stroke-width:1.5px
+    style BRANCH_A fill:#e8f4e8,stroke:#2d7a2d,stroke-width:1px
+    style BRANCH_B fill:#fff4e8,stroke:#c47a00,stroke-width:1px
+    style BRANCH_C fill:#ffeef0,stroke:#cc2244,stroke-width:1px
+    style STEP4 fill:#e8f0ff,stroke:#2060c0,stroke-width:1.5px
 ```
 
 ---
@@ -533,13 +665,17 @@ The ADK session state is the **shared memory bus** between all agents. The follo
 
 | Key | Written by | Read by | Contents |
 |-----|-----------|---------|----------|
-| `products_data` | Caller / pre-populated | `ImageValidatorAgent`, `ValidateAndScoreAgent` | JSON array of normalized product records |
-| `image_validation_json` | `ImageValidatorAgent` | `ValidateAndScoreAgent` | Per-product image compliance results + summary |
-| `compliance_search_result` | `ComplianceSearchAgent` | `ImageValidatorAgent` (via AgentTool return) | Compliance rules from Vertex AI Search |
-| `url_context_result` | `UrlContextAgent` | `ImageValidatorAgent` (via AgentTool return) | Visual analysis findings for a single image |
-| `validation_and_score_json` | `ValidateAndScoreAgent` | Caller / downstream | Confidence scores + ai_comments per product |
+| `products_data` | Caller / pre-populated | `ImageValidatorAgent`, `AttributeValidationAgent`, `LegalValidationAgent`, `ScoreAgent` | JSON array of normalized product records |
+| `compliance_rules` | `ComplianceSearchAgent` (initial), `LegalAgent` (enriched) | `ImageValidatorAgent`, `AttributeValidationAgent`, `LegalValidationAgent` | Consolidated compliance + legal rules; `LegalAgent` appends legal entries to the list written by `ComplianceSearchAgent` |
+| `image_validation_json` | `ImageValidatorAgent` | `ScoreAgent` | Per-product image compliance results + per-rule observations + summary |
+| `attribute_validation_json` | `AttributeValidationAgent` | `ScoreAgent` | Per-product attribute validation results + missing/empty attribute list |
+| `legal_validation_json` | `LegalValidationAgent` | `ScoreAgent` | Per-product legal compliance results + violation list |
+| `validation_and_score_json` | `ScoreAgent` | Caller / downstream | Confidence scores + ai_comments per product |
 
-**Sequential guarantee:** Because the root agent is a `SequentialAgent`, `image_validation_json` is guaranteed to exist in session state before `ValidateAndScoreAgent` starts. There is no race condition.
+**Ordering guarantees:**  
+- Steps 1 → 2 → 3 → 4 are sequentially ordered by the root `SequentialAgent`.  
+- Within Step 3, the `ParallelAgent` runs all three branches simultaneously. Each branch writes to its own distinct key, so there is no write conflict.  
+- `ScoreAgent` (Step 4) only starts after the `ParallelAgent` has reported all three branches complete — guaranteeing `image_validation_json`, `attribute_validation_json`, and `legal_validation_json` all exist before scoring begins.
 
 ---
 
@@ -549,7 +685,7 @@ The ADK session state is the **shared memory bus** between all agents. The follo
 
 | Service | Usage |
 |---------|-------|
-| **Vertex AI (Gemini 2.5 Flash)** | LLM powering all four `LlmAgent` instances |
+| **Vertex AI (Gemini 2.5 Flash)** | LLM powering all six `LlmAgent` instances |
 | **Vertex AI Search** | Datastore `poc-policy-datastore` indexing compliance rules |
 | **BigQuery** | Target storage for validation results (inactive in current pipeline) |
 
@@ -557,7 +693,7 @@ The ADK session state is the **shared memory bus** between all agents. The follo
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| `google-adk` | ≥ 0.3.0 | Agent framework (`SequentialAgent`, `LlmAgent`, `FunctionTool`, `AgentTool`) |
+| `google-adk` | ≥ 0.3.0 | Agent framework (`SequentialAgent`, `ParallelAgent`, `LlmAgent`, `FunctionTool`) |
 | `google-cloud-bigquery` | ≥ 3.25.0 | BigQuery client for result storage |
 | `google-cloud-aiplatform` | ≥ 1.38.0 | Vertex AI Search integration |
 | `pydantic` | ≥ 2.0.0 | `ValidationRecord` data model |
