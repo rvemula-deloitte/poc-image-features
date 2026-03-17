@@ -22,11 +22,10 @@
    - 4.7 [Legal Validation Agent — `LegalValidationAgent`](#47-legal-validation-agent--legalvalidationagent)
    - 4.8 [Score Agent — `ScoreAgent`](#48-score-agent--scoreagent)
 5. [Tools Reference](#5-tools-reference)
-6. [Data Models](#6-data-models)
-7. [Compliance Rules](#7-compliance-rules)
-8. [Data Flow Flowchart](#8-data-flow-flowchart)
-9. [Session State Lifecycle](#9-session-state-lifecycle)
-10. [External Services & Dependencies](#10-external-services--dependencies)
+6. [Compliance Rules](#6-compliance-rules)
+7. [Data Flow Flowchart](#7-data-flow-flowchart)
+8. [Session State Lifecycle](#8-session-state-lifecycle)
+9. [External Services & Dependencies](#9-external-services--dependencies)
 
 ---
 
@@ -44,7 +43,7 @@ The pipeline operates **sequentially** — each agent produces output that is st
 | Enrich compliance rules with live legal data | `LegalAgent` (Step 2) — fetches rules from web URLs, merges into `compliance_rules` |
 | Validate product images (dimension, quality, content) | `ImageValidatorAgent` (Step 3 — parallel) + `get_image_dimensions_tool` + Gemini vision |
 | Enforce attribute completeness per product type | `AttributeValidationAgent` (Step 3 — parallel) + Vertex AI Search |
-| Validate products against legal requirements | `LegalValidationAgent` (Step 3 — parallel) |
+| Validate products against legal requirements | `LegalValidationAgent` (Step 3 — parallel) Implement if needed |
 | Score each product's reliability (0–100) | `ScoreAgent` (Step 4) — LLM reasoning over all validation results |
 | Surface actionable issues per product | Structured JSON output at every stage |
 
@@ -68,25 +67,6 @@ product_validation_pipeline           (SequentialAgent — root)
 │   └── LegalValidationAgent          (LlmAgent — parallel branch C)
 └── ScoreAgent                        (LlmAgent — Step 4)
 ```
-
-### Component Map
-
-| Component | Type | File | Responsibility |
-|-----------|------|------|----------------|
-| `product_validation_pipeline` | `SequentialAgent` | `root_agent/agent.py` | Orchestrates all sub-agents in order |
-| `ComplianceSearchAgent` | `LlmAgent` | `sub_agents/compliance_search_agent.py` | Fetches image + attribute compliance rules from Vertex AI Search; writes `compliance_rules` |
-| `LegalAgent` | `LlmAgent` | `sub_agents/legal_agent.py` | Fetches legal rules from web URLs; merges them into `compliance_rules` |
-| `validation_group` | `ParallelAgent` | `root_agent/agent.py` | Runs all three validation agents simultaneously |
-| `ImageValidatorAgent` | `LlmAgent` | `sub_agents/validate_image_agent.py` | Validates product images using Gemini vision + dimension check |
-| `AttributeValidationAgent` | `LlmAgent` | `sub_agents/validate_attribute_agent.py` | Validates product attributes against compliance rules from Vertex AI Search |
-| `LegalValidationAgent` | `LlmAgent` | `sub_agents/legal_validation_agent.py` | Validates products against legal compliance requirements |
-| `ScoreAgent` | `LlmAgent` | `sub_agents/confidence_score_agent.py` | Combines all three validation results into a final per-product confidence score |
-| `get_image_dimensions_tool` | `FunctionTool` | `tools/tools.py` | Downloads image; returns pixel dimensions |
-| `fetch_products_tool` | `FunctionTool` | `tools/tools.py` | Fetches products from Mirakl API |
-| `bigquery_write_tool` | `FunctionTool` | `tools/bigquery_tool.py` | Writes results to BigQuery |
-| `ValidationRecord` | Pydantic model | `models.py` | Flattens data into BigQuery row format |
-
----
 
 ## 3. Active Pipeline Execution Flow
 
@@ -468,78 +448,13 @@ Downloads the image at the given URL using `requests.get` and opens it with `PIL
 
 ---
 
-### `fetch_products_tool`
-
-| Property | Value |
-|----------|-------|
-| Type | `FunctionTool` (wraps `fetch_products_from_mirakl`) |
-| File | [tools/tools.py](../tools/tools.py) |
-| Input | `updated_since`, `updated_to`, `product_sku` (all optional strings) |
-| Output | `List[Dict]` — normalized product records |
-| Endpoint | `https://kohlsus-dev.mirakl.net/api/mcm/products/export` |
-| Auth | Bearer token in `Authorization` header |
-| Timeout | 30 seconds |
-
-Fetches products from the Mirakl API and normalizes each product into the standard pipeline shape:
-
-```json
-{
-  "id": "<mirakl_product_id>",
-  "product_type": "<product_category>",
-  "product_sku": "<sku>",
-  "product_attributes": { "brand": "...", "title": "...", ... },
-  "images": [{ "url": "<main_image_url>" }]
-}
-```
-
----
-
-### `bigquery_write_tool`
-
-| Property | Value |
-|----------|-------|
-| Type | `FunctionTool` (wraps `write_to_bigquery`) |
-| File | [tools/bigquery_tool.py](../tools/bigquery_tool.py) |
-| Input | `product_details`, `image_validation`, `attribute_validation` (all dicts) |
-| Output | `{ status, message }` |
-| Destination | `{PROJECT}.{BQ_DATASET}.{BQ_TABLE}` (env-configured) |
-
-Uses `ValidationRecord` (Pydantic model) to flatten nested product, image, and attribute data into a single BigQuery row and calls `client.insert_rows_json`. **Currently not active in the pipeline.**
-
----
-
-## 6. Data Models
-
-### `ValidationRecord` (Pydantic)
-
-**File:** [models.py](../models.py)
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `product_details` | `dict` | Original product data from API |
-| `image_validation` | `dict` | Image dimension validation results |
-| `attribute_validation` | `dict` | Product attribute validation results |
-
-The `to_bq_row()` method flattens all three nested structures into a single flat dict suitable for BigQuery insertion. Key flattened fields:
-
-| BQ Column | Source |
-|-----------|--------|
-| `product_id` | `product_details.id` |
-| `product_type` | `product_details.product_type` |
-| `validation_status` | `"PASS"` if both image and attribute are valid, else `"FAIL"` |
-| `validation_timestamp` | `datetime.utcnow().isoformat()` |
-| `image_valid` | `image_validation.valid` |
-| `image_width` / `image_height` | `image_validation.width/height` |
-| `attribute_valid` | `attribute_validation.valid` |
-| `missing_attributes` | JSON-serialized list |
-| `empty_attributes` | JSON-serialized list |
-
----
-
-## 7. Compliance Rules
+## 6. Compliance Rules
 
 Stored in: [docs/product_validation_compliance.txt](product_validation_compliance.txt)  
 Indexed in: Vertex AI Search datastore `poc-policy-datastore`
+
+> **Note — Current approach is not the final implementation.**  
+> Compliance rules are currently maintained as a static text file that is manually indexed into the Vertex AI Search datastore. In the future, this will be replaced by a **Google Drive connector** (or an equivalent managed connector) that automatically syncs source documents from Google Drive directly into the datastore, eliminating the need for manual uploads and keeping the indexed rules up to date without any pipeline changes.
 
 ### Image Requirements (applies to all products)
 
@@ -567,7 +482,7 @@ Indexed in: Vertex AI Search datastore `poc-policy-datastore`
 
 ---
 
-## 8. Data Flow Flowchart
+## 7. Data Flow Flowchart
 
 ```mermaid
 flowchart TD
@@ -659,7 +574,7 @@ flowchart TD
 
 ---
 
-## 9. Session State Lifecycle
+## 8. Session State Lifecycle
 
 The ADK session state is the **shared memory bus** between all agents. The following keys are written and consumed throughout the pipeline:
 
@@ -679,7 +594,7 @@ The ADK session state is the **shared memory bus** between all agents. The follo
 
 ---
 
-## 10. External Services & Dependencies
+## 9. External Services & Dependencies
 
 ### GCP Services
 
@@ -687,7 +602,6 @@ The ADK session state is the **shared memory bus** between all agents. The follo
 |---------|-------|
 | **Vertex AI (Gemini 2.5 Flash)** | LLM powering all six `LlmAgent` instances |
 | **Vertex AI Search** | Datastore `poc-policy-datastore` indexing compliance rules |
-| **BigQuery** | Target storage for validation results (inactive in current pipeline) |
 
 ### Python Dependencies
 
@@ -700,15 +614,3 @@ The ADK session state is the **shared memory bus** between all agents. The follo
 | `python-dotenv` | ≥ 1.0.0 | Loading `GOOGLE_CLOUD_PROJECT` and BQ env vars |
 | `pillow` | ≥ 10.0.0 | Image dimension extraction in `get_image_dimensions` |
 | `requests` | ≥ 2.31.0 | HTTP client for image download and Mirakl API |
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GOOGLE_CLOUD_PROJECT` | Yes | GCP project ID used for Vertex AI and BigQuery |
-| `BQ_DATASET` | No (default: `product_validation`) | BigQuery dataset name |
-| `BQ_TABLE` | No (default: `validation_results`) | BigQuery table name |
-
----
-
-*End of Technical Design Document*
