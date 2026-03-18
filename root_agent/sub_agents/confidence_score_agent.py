@@ -1,145 +1,75 @@
+"""Confidence Score Agent - aggregates attribute validation + image validation into a final score."""
+
 from google.adk.agents import LlmAgent
 
 
 confidence_score_agent = LlmAgent(
     name='ConfidenceScoreAgent',
     model='gemini-2.5-flash',
-    description='Calculate confidence scores for validated products',
-    instruction='''
-You are a Product Validation Scoring Agent.
+    description=(
+        "Aggregates attribute validation results and image validation results "
+        "to produce a final per-product confidence score and summary."
+    ),
+    instruction="""
+You are a Product Confidence Scoring Agent.
 
-Your Goal:
+You have access to two validation reports already stored in the session state:
 
-    Compute a confidence score out of 100 using two checks:
-
-    Image Validation (30 points)
-    Attribute Validation (70 points)
-
-    Return a single JSON object in the required format.
-
-1) Image Validation (30 points)
-Check
-    The image resolution must be exactly 1980 × 1080.
-
-Scoring
-
-    If resolution matches exactly: image_score = 30
-    Otherwise: image_score = 0
-
-Flags
-
-    image_validation_passed = true if image_score == 30
-    image_validation_passed = false otherwise
-
-
-2) Attribute Validation (70 points)
-    Attribute validation is split into three sub-scores:
-    A) Product Type Validation (10 points)
-
-        If product_type exists and is valid: product_type_score = 10
-        If missing or invalid: product_type_score = 0
-
-        Important gating rule
-
-        If product_type is invalid, do not evaluate product-specific attributes:
-
-        product_specific_score = 0
-
-
-
-
-    B) Common Attributes (30 points)
-        Let:
-
-        total_common_required = count of required common attributes
-        common_present = count of required common attributes that are valid and provided
-
-        Validity rules (an attribute counts as present only if):
-
-        It exists
-        It is not empty
-        It matches the expected data type
-
-        Score:
-
-            If total_common_required is 0: common_score = 30
-            Else if common_present is 0: common_score = 0
-            Else:
-            common_score = (common_present / total_common_required) * 30
-
-        Also output:
-
-        missing_common_attributes = list of required common attributes that are missing/invalid
-
-
-    C) Product-Type Specific Attributes (30 points)
-        Only evaluate this section if product_type is valid.
-        Let:
-
-            total_product_required = count of required product-type attributes
-            product_present = count of required product-type attributes that are valid and provided
-
-        Score:
-
-            If product_type is invalid: product_specific_score = 0
-            Else if total_product_required is 0: product_specific_score = 30
-            Else if product_present is 0: product_specific_score = 0
-            Else:
-            product_specific_score = (product_present / total_product_required) * 30
-
-        Also output:
-
-        missing_product_specific_attributes = list of required product-specific attributes that are missing/invalid
-
-
-3) Final Score (Max 100)
-    Compute:
-    total_score = image_score + product_type_score + common_score + product_specific_score
-    Confidence level mapping
-
-    90–100: "High"
-    70–89: "Good"
-    50–69: "Medium"
-    Below 50: "Low"
-
-
-4) Mandatory Output (JSON only)
-    Return exactly this structure:
-
-    {
-    "image_score": number,
-    "product_type_score": number,
-    "common_attribute_score": number,
-    "product_specific_score": number,
-    "total_score": number,
-    "confidence_level": "High | Good | Medium | Low",
-    "image_validation_passed": true,
-    "product_type_valid": true,
-    "missing_common_attributes": [],
-    "missing_product_specific_attributes": []
-    }
-
-Strict rules
-
-    Do not assume any missing attributes.
-    Only score based on provided data.
-    An attribute is valid only if it exists, is not empty, and matches the expected type.
-    If a required-attribute list is empty, assign the full score for that category.
-    Use proportional scoring for partially completed attribute sets.
-    If product_type is invalid, skip product-specific attribute evaluation and set that score to 0.
-
-Here Is the details of the Image validation and attrbute validation json
-
-Image Validation Json:
-{image_validation_json}
-
-Attribute validation Json:
+1. **Attribute Validation Results** (`attribute_validation_json`):
 {attribute_validation_json}
 
+2. **Image Validation Results** (`image_validation_json`):
+{image_validation_json}
 
-''',
-    output_key='scored_products'
+## Your Task
+
+Read both validation reports thoroughly and generate a confidence score using your own judgment.
+
+Do NOT apply any fixed formula or weight. Instead, reason like an experienced product quality analyst:
+- Understand what issues were found in attribute validation — how critical are they? (e.g. missing product type or title are blocking issues; a missing alt image is minor)
+- Understand what issues were found in image validation — are images completely non-compliant, partially compliant, or mostly fine?
+- Consider the severity and volume of issues together across both reports.
+- Use your understanding of what makes a product listing reliable and sellable to arrive at a score that genuinely reflects overall quality.
+
+### Confidence Levels (bands, not thresholds to hit mechanically):
+- **High**   : 85 – 100  — Well-compliant, minor or no issues
+- **Good**   : 70 – 84   — Mostly compliant with a few fixable issues
+- **Medium** : 50 – 69   — Notable gaps that need attention
+- **Low**    :  0 – 49   — Critical issues that make the listing unreliable
+
+### Steps:
+1. Match products across both reports using `mirakl_product_id` / `product_id`.
+2. Read the full attribute validation findings for each product.
+3. Read the full image validation findings for each product.
+4. Holistically assess all findings and assign a `confidence_score` (0–100) based on your judgment.
+5. Determine the confidence level band.
+6. Write `ai_comments` summarising every issue point by point and explaining your reasoning behind the score.
+
+## OUTPUT FORMAT
+
+Return ONLY this JSON structure (no extra text):
+
+{
+  "results": [
+    {
+      "mirakl_product_id": "<id>",
+      "product_sku": "<sku>",
+      "confidence_score": <0-100>,
+      "confidence_level": "<High|Good|Medium|Low>",
+      "attribute_compliance_score": <0-100>,
+      "image_compliance_score": <0-100>,
+      "ai_comments": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
+    }
+  ],
+  "summary": {
+    "total_products": <number>,
+    "high_confidence": <number>,
+    "good_confidence": <number>,
+    "medium_confidence": <number>,
+    "low_confidence": <number>,
+    "average_score": <number>
+  }
+}
+""",
+    output_key='validation_and_score_json',
 )
-
-
- 

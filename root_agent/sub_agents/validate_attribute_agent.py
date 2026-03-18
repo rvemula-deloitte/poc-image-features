@@ -14,85 +14,61 @@ DATASTORE_ID = f"projects/{PROJECT_ID}/locations/us/collections/default_collecti
 try:
     compliance_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_ID)
 
-    validate_and_score_agent = LlmAgent(
-        name='ValidateAndScoreAgent',
+    validate_attribute_agent = LlmAgent(
+        name='ValidateAttributeAgent',
         model='gemini-2.5-flash',
-        description="Validate attributes and calculate confidence score using compliance rules from Vertex AI Search",
+        description="Validate product attributes against compliance rules retrieved from Vertex AI Search",
         instruction="""
-    You are a Product Validation and Reliability Scoring Agent.
+You are a Product Attribute Validation Agent.
 
-    You will receive:
-    1. Product data to validate
-    2. Image validation results: {image_validation_json}
+You will receive product data from session state (products_data).
 
-    Your Task:
+Your Task:
 
-    ## STEP 1: Retrieve Compliance Rules
+## STEP 1: Retrieve Compliance Rules
 
-    Use the Vertex AI Search tool to look up:
-    - Required attributes for all products (search: "common required attributes")
-    - Product-type specific required attributes (search: "required attributes for product type <product_type>")
-    - Image validation requirements (search: "image validation requirements")
+Use the `compliance_search_tool` tool to look up:
+- Required attributes for all products (search: "common required attributes")
+- Product-type specific required attributes (search: "required attributes for product type <product_type>")
+- Any attribute-level validation rules (search: "attribute validation rules")
 
-    ## STEP 2: Validate and Score
+## STEP 2: Validate Each Product's Attributes
 
-    Analyze each product and determine its reliability based on:
+For every product in products_data, check:
+1. **Required Fields** — Are all mandatory attributes present and non-empty?
+2. **Product-Type Rules** — Do the attributes satisfy category/type-specific requirements?
+3. **Data Quality** — Are values well-formed, within expected ranges, or properly formatted?
+4. **Missing / Empty Fields** — List every attribute that is absent or blank.
 
-    1. **Compliance Rules** (from search results)
-    - Required attributes for all products
-    - Product-type specific required attributes
-    - Validation rules
+## OUTPUT FORMAT
 
-    2. **Image Validation Results**
-    - Whether the product image meets requirements
+Return ONLY this JSON structure (no extra text):
 
-    3. **Product Data Quality**
-    - Completeness of attributes
-    - Missing or empty required fields
-    - Overall data integrity
-
-    Based on your analysis of all these factors, provide:
-    - A confidence score (0-100) representing how reliable/compliant the product is
-    - A confidence level (High/Good/Medium/Low)
-    - Reasoning for your assessment
-    - List of issues found
-
-    ## OUTPUT FORMAT
-
-    Return ONLY this JSON structure (no extra text):
-
+{
+  "results": [
     {
-    "results": [
-        {
-        "mirakl_product_id": "<id>",
-        "product_sku": "<id>",
-        "confidence_score": <0-100>,
-        "ai_comments": "<reasoning and issues found. mention specific missing attributes, image validation failures, and any other compliance issues point by point.>",
-        }
-    ],
-    "summary": {
-        "total_products": <number>,
-        "high_confidence": <number>,
-        "good_confidence": <number>,
-        "medium_confidence": <number>,
-        "low_confidence": <number>,
-        "average_score": <number>
+      "mirakl_product_id": "<id>",
+      "product_sku": "<sku>",
+      "attribute_compliance_score": <0-100>,
+      "missing_attributes": ["<attr1>", "<attr2>"],
+      "invalid_attributes": [
+        {"attribute": "<name>", "issue": "<description>"}
+      ],
+      "passed_checks": ["<check1>", "<check2>"],
+      "failed_checks": ["<check1>", "<check2>"],
+      "ai_comments": "<detailed reasoning, point by point>"
     }
-    }
-    """,
-        output_key='validation_and_score_json',
-        tools=[compliance_search_tool],
-        generate_content_config=types.GenerateContentConfig(
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                maximum_remote_calls=15,
-            ),
-            tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(
-                    mode="AUTO",
-                    allowed_function_names=[compliance_search_tool.name]
-                )
-            )
-        ),
+  ],
+  "summary": {
+    "total_products": <number>,
+    "fully_compliant": <number>,
+    "partially_compliant": <number>,
+    "non_compliant": <number>
+  }
+}
+""",
+        output_key='attribute_validation_json',
+        tools=[compliance_search_tool]
     )
 except Exception as e:
-    print(f"Error initializing validate_and_score_agent: {e}")
+    print(f"Error initializing validate_attribute_agent: {e}")

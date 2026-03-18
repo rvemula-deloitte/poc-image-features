@@ -31,9 +31,10 @@ Your task is to search for ALL mandatory image requirements, including:
 - Background, content, and quality guidelines
 
 Steps:
-1. Use the Vertex AI Search tool with the query: "mandatory image requirements for product listings"
-2. Also search for: "image validation rules dimensions format background"
-3. Consolidate all retrieved rules, removing duplicates.
+1. Call `compliance_search_tool` simultaneously with ALL of the following queries in a single parallel invocation:
+   - "mandatory image requirements for product listings"
+   - "image validation rules dimensions format background"
+2. Consolidate all retrieved rules from all queries, removing duplicates.
 4. Return your findings as JSON:
 
 {
