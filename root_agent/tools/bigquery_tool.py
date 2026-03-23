@@ -30,61 +30,63 @@ def _get_table_id() -> str:
 
 
 def write_to_bigquery(
-    product_details: dict[str, Any],
-    image_validation: dict[str, Any],
-    attribute_validation: dict[str, Any],
+    confidence_score_json: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Write validation results to BigQuery.
+    Write confidence score results to BigQuery.
 
     Args:
-        product_details: Original product data from the API.
-        image_validation: Image dimension validation results.
-        attribute_validation: Product attribute validation results.
+        confidence_score_json: Output JSON from Confidence Score Agent.
 
     Returns:
         Dictionary with status and result details.
     """
-    # Unwrap tool responses if they're nested
-    if 'fetch_product_from_api_response' in product_details:
-        product_details = product_details['fetch_product_from_api_response']
-    
-    if 'validate_image_response' in image_validation:
-        image_validation = image_validation['validate_image_response']
-    
-    if 'Attribute_validation_response' in attribute_validation:
-        attribute_validation = attribute_validation['Attribute_validation_response']
-    
-    record = ValidationRecord(
-        product_details=product_details,
-        image_validation=image_validation,
-        attribute_validation=attribute_validation
-    )
-    row = record.to_bq_row()
+    if confidence_score_json is None:
+        return {"status": "error", "message": "confidence_score_json is required"}
+
+    # Accept nested tool outputs
+    if isinstance(confidence_score_json, dict) and "validation_and_score_json" in confidence_score_json:
+        confidence_score_json = confidence_score_json["validation_and_score_json"]
+
+    if not isinstance(confidence_score_json, dict):
+        return {"status": "error", "message": "confidence_score_json must be a JSON object"}
+
+    results = confidence_score_json.get("results", [])
+    if not isinstance(results, list):
+        return {"status": "error", "message": "confidence_score_json.results must be a list"}
+
+    rows = []
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        rows.append({
+            "mirakl_product_id": item.get("mirakl_product_id"),
+            "product_sku": item.get("product_sku"),
+            "confidence_score": item.get("confidence_score"),
+            "status": item.get("status"),
+            "updated_at": item.get("updated_at"),
+            "created_at": item.get("created_at"),
+            "payload": item.get("payload", {}),
+            "ai_comment": item.get("ai_comment"),
+        })
+
+    if not rows:
+        return {"status": "error", "message": "No valid rows found in confidence_score_json.results"}
 
     try:
         client = _get_bigquery_client()
         table_id = _get_table_id()
-
-        errors = client.insert_rows_json(table_id, [row])
-
+        errors = client.insert_rows_json(table_id, rows)
         if errors:
-            return {
-                "status": "error",
-                "message": f"BigQuery insert failed: {errors}",
-            }
-
+            return {"status": "error", "message": f"BigQuery insert failed: {errors}"}
         return {
             "status": "success",
-            "message": "Successfully inserted validation record",
+            "message": "Successfully inserted confidence score validation row(s)",
             "table": table_id,
+            "rows_inserted": len(rows),
         }
-
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to write to BigQuery: {str(e)}",
-        }
+        return {"status": "error", "message": f"Failed to write to BigQuery: {str(e)}"}
 
 
 # Create the ADK FunctionTool
