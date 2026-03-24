@@ -9,9 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 # Vertex AI Search configuration - using direct datastore ID
-# DATASTORE_ID = f"projects/{PROJECT_ID}/locations/us/collections/default_collection/dataStores/poc-policy-datastore_1772199893592"
-
-DATASTORE_ID = f"projects/kohls-bda-genai-lle/locations/us/collections/default_collection/dataStores/validation-documents-stg_1774252852913_gcs_store"
+DATASTORE_ID = f"projects/{PROJECT_ID}/locations/us/collections/default_collection/dataStores/validation-documents-stg_1774252852913_gcs_store"
 
 try:
     compliance_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_ID)

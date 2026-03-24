@@ -31,19 +31,44 @@ Do NOT apply any fixed formula or weight. Instead, reason like an experienced pr
 - Consider the severity and volume of issues together across both reports.
 - Use your understanding of what makes a product listing reliable and sellable to arrive at a score that genuinely reflects overall quality.
 
-### Confidence Levels (bands, not thresholds to hit mechanically):
-- **High**   : 85 – 100  — Well-compliant, minor or no issues
-- **Good**   : 70 – 84   — Mostly compliant with a few fixable issues
-- **Medium** : 50 – 69   — Notable gaps that need attention
-- **Low**    :  0 – 49   — Critical issues that make the listing unreliable
-
 ### Steps:
 1. Match products across both reports using `mirakl_product_id` / `product_id`.
 2. Read the full attribute validation findings for each product.
 3. Read the full image validation findings for each product.
 4. Holistically assess all findings and assign a `confidence_score` (0–100) based on your judgment.
-5. Determine the confidence level band.
-6. Write `ai_comments` summarising every issue point by point and explaining your reasoning behind the score.
+5. Write `ai_comments` summarising every issue point by point and explaining your reasoning behind the score.
+6. Determine the `validation_decision` for each product (see rules below).
+
+## VALIDATION DECISION RULES
+
+Based on the compiled findings from both validation agents, classify each product into exactly one of three decisions:
+
+### Accepted
+- The product passes all attribute and image checks (or has only negligible minor issues).
+- No blocking attribute failures, no image compliance violations.
+- The product is ready to be pushed live.
+
+### Temporary Rejection
+- The product has correctable errors that the seller can fix and resubmit under the same Product ID.
+- Examples of correctable issues:
+  - Spelling mistakes or grammar errors in title / description
+  - Competitor brand names or mentions present
+  - Missing or incorrect dimensions / size codes
+  - Incorrect categorisation or product type
+  - Missing non-critical attributes (e.g. secondary colour, material)
+  - Minor image issues (e.g. small watermark, slight background deviation)
+- After resubmission the product status moves to "pending verification".
+
+### Permanent Rejection
+- The product has uncorrectable violations that require complete deletion and re-upload by the seller.
+- Examples of permanent violations:
+  - Use of legally or PR-sensitive terms (e.g. "bamboo" on non-bamboo material)
+  - Inappropriate, risqué, or legally infringing content in images or text
+  - Structural catalog errors that cannot be patched (e.g. wrong product entirely, fraudulent listing)
+  - Severe image violations (e.g. explicit content, counterfeit branding)
+
+For `decision_reasons`, list every specific finding from the validation reports that directly drove the decision.
+If the decision is **Accepted**, list the key checks that passed.
 
 ## OUTPUT FORMAT
 
@@ -61,11 +86,10 @@ Return ONLY this JSON structure (no extra text):
   ],
   "summary": {
     "total_products": <number>,
-    "high_confidence": <number>,
-    "good_confidence": <number>,
-    "medium_confidence": <number>,
-    "low_confidence": <number>,
-    "average_score": <number>
+    "average_score": <number>,
+    "accepted": <number>,
+    "temporary_rejections": <number>,
+    "permanent_rejections": <number>
   }
 }
 """,

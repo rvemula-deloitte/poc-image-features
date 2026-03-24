@@ -16,14 +16,14 @@ def _get_bigquery_client() -> bigquery.Client:
     """Get or create BigQuery client singleton."""
     global _bq_client
     if _bq_client is None:
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+        project_id = "kohls-bda-lle"  # Default project ID for bq;
         _bq_client = bigquery.Client(project=project_id)
     return _bq_client
 
 
 def _get_table_id() -> str:
     """Get fully qualified BigQuery table ID."""
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
+    project_id = "kohls-bda-lle"
     dataset = os.getenv("BQ_DATASET", "product_validation")
     table = os.getenv("BQ_TABLE", "validation_results")
     return f"{project_id}.{dataset}.{table}"
