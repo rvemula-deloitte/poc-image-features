@@ -16,6 +16,8 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 
 DATASTORE_ID = f"projects/kohls-bda-genai-lle/locations/us/collections/default_collection/dataStores/validation-documents-stg_1774252852913_gcs_store"
 
+
+
 try:
     compliance_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_ID)
 
