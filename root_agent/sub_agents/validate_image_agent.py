@@ -114,9 +114,15 @@ For every image URL labelled above, call `get_image_dimensions_tool` with that U
 to get exact pixel width, height, and format.
 
 ## STEP 3 — Visual Compliance Check
-For each injected image, visually inspect it against every compliance rule from Step 1.
-You can see the actual image — assess background colour, centring, clutter, watermarks,
-resolution appearance, and any other visual rules directly.
+For each injected image, visually inspect it against every compliance rule from Step 1, including:
+- Image size and quality (resolution, clarity, no blur)
+- Size chart inclusion for apparel
+- Clearly shows the item being sold
+- Correct item compared to title
+- No text overlays or watermarks
+- Background rules: Ready to Wear must have white background (some deviation from 1:1 aspect ratio allowed); Lifestyle can have non-white background but must be 1:1 aspect ratio
+- Brand consistency in images (no conflicting brands)
+- For variants: image logically matches supplied color
 
 ## STEP 4 — Return aggregated results
 
