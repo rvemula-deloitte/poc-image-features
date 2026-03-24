@@ -61,12 +61,9 @@ def write_to_bigquery(
             continue
         rows.append({
             "mirakl_product_id": item.get("mirakl_product_id"),
-            "product_sku": item.get("product_sku"),
-            "confidence_score": item.get("confidence_score"),
             "status": item.get("status"),
-            "updated_at": item.get("updated_at"),
-            "created_at": item.get("created_at"),
-            "payload": item.get("payload", {}),
+            "confidence_score": item.get("confidence_score"),
+            "validation_decision":item.get("validation_decision"),
             "ai_comment": item.get("ai_comment"),
         })
 

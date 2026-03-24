@@ -53,12 +53,9 @@ Return ONLY this JSON structure (no extra text):
   "results": [
     {
       "mirakl_product_id": "<id>",
-      "product_sku": "<sku>",
-      "confidence_score": <0-100>,
-      "updated_at": "<timestamp>",
-      "created_at": "<timestamp>",
       "status": "<Validated | Needs Review>",
-      "payload": "for now an empty string, but can be used in the future to store intermediate data or reasoning steps if needed",
+      "confidence_score": <0-100>,
+      "validation_decision":<Accepted | Temparary Rejected | Permanant Rejected>
       "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
     }
   ],
