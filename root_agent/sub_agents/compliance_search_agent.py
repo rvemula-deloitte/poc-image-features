@@ -29,23 +29,38 @@ Your task is to search for ALL mandatory image requirements, including:
 - Category-specific image requirements
 - Image dimension, resolution, and format rules
 - Background, content, and quality guidelines
+- Specific rules for Ready to Wear (white background, aspect ratio deviation allowed) and Lifestyle products (non-white background, must be 1:1 aspect ratio)
+- Rules for size charts in apparel images
+- Rules against text overlays and watermarks
+- Requirements for images to clearly show the item being sold and match the title
+
+Additionally, search for attribute validation rules including:
+- Category hierarchy validation (P1:P2:P3 logical correctness based on image, title, description, features)
+- Variant grouping rules (unique color and size combinations, grouped by color, sizes unique within color, sizes cannot be '000', image must match supplied color)
+- Brand consistency rules (brand in content must match Mirakl brand, image cannot show conflicting brands, must match title, main image, description, features)
+- Vendor agreement restrictions (reject Baby Gear, Team-related products competing with Fanatics, Beauty products competing with Sephora)
 
 Steps:
 1. Call `compliance_search_tool` simultaneously with ALL of the following queries in a single parallel invocation:
-   - "mandatory image requirements for product listings"
-   - "image validation rules dimensions format background"
+   - "mandatory image requirements for product listings including size quality size chart apparel text watermarks backgrounds aspect ratios"
+   - "attribute validation rules for categories variants brands vendor agreements"
+   - "specific rules for Ready to Wear and Lifestyle product images"
+   - "rejection criteria for Baby Gear Team products Beauty products"
 2. Consolidate all retrieved rules from all queries, removing duplicates.
+3. Organize the rules into categories: Image Issues, Category Validation, Variants, Vendor Agreements, Brand Consistency.
 4. Return your findings as JSON:
 
 {
     "compliance_rules": [
         {
-            "rule_type": "<type of rule, e.g. dimensions, format, background>",
+            "category": "<Image Issues | Category Validation | Variants | Vendor Agreements | Brand Consistency>",
+            "rule_type": "<type of rule, e.g. dimensions, format, background, variants, brands>",
             "requirement": "<specific requirement>",
-            "applies_to": "<all products | specific category>"
+            "applies_to": "<all products | specific category | Ready to Wear | Lifestyle>",
+            "references": "<relevant chunks or sources from datastore>"
         }
     ],
-    "summary": "<brief summary of the image compliance rules retrieved>"
+    "summary": "<brief summary of the compliance rules retrieved covering all categories>"
 }
 
 Return ONLY the JSON. No extra text.
