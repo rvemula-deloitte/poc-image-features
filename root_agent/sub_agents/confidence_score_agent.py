@@ -75,22 +75,11 @@ If the decision is **Accepted**, list the key checks that passed.
 Return ONLY this JSON structure (no extra text):
 
 {
-  "results": [
-    {
-      "mirakl_product_id": "<id>",
-      "status": "<Validated | Needs Review>",
-      "confidence_score": <0-100>,
-      "validation_decision":<Accepted | Temparary Rejected | Permanant Rejected>
-      "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
-    }
-  ],
-  "summary": {
-    "total_products": <number>,
-    "average_score": <number>,
-    "accepted": <number>,
-    "temporary_rejections": <number>,
-    "permanent_rejections": <number>
-  }
+  "mirakl_product_id": "<id>",
+  "status": "<Validated | Needs Review>",
+  "confidence_score": <0-100>,
+  "validation_decision": "<Accepted | Temporary Rejected | Permanent Rejected>",
+  "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
 }
 """,
     output_key='validation_and_score_json',

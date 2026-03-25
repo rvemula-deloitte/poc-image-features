@@ -28,6 +28,8 @@ Your Task:
 ## STEP 1: Use Provided Compliance Rules
 
 Use the compliance rules from {compliance_search_result} as the source of truth. Do NOT call any tools to re-fetch rules.
+Respect each rule's scope: if a requirement or restriction is defined as category-specific (for certain P1/P2/P3 values, product types, or groups like Ready to Wear or Lifestyle), 
+apply it only to products in that category. Do not treat category-specific rules as global.
 
 ## STEP 2: Validate Each Product's Attributes
 
@@ -39,35 +41,26 @@ For every product in products_data, check:
 6. **Variants** — Each variant has unique color/size, grouped by color, sizes unique within color, sizes != '000', image matches color.
 7. **Brand Consistency** — Brand in content matches Mirakl brand, no conflicting brands in image/title/description/features.
 8. **Vendor Agreements** — Reject if Baby Gear, Team-related (Fanatics), Beauty (Sephora).
+9. **PR and Legal Requirements** — All products must follow Kohl's PR and Legal requirements (for example, warranty language and other legal/marketing claims must match the allowed patterns and must not use prohibited wording as defined in the compliance rules).
+10. **Spelling Correctness** — Check for obvious spelling mistakes in key customer-facing fields such as title, description, bullet features, and any other textual attributes. Treat spelling issues as invalid_attributes with clear issue descriptions.
 
 ## OUTPUT FORMAT
 
 Return ONLY this JSON structure (no extra text):
 
 {
-  "results": [
-    {
-      "mirakl_product_id": "<id>",
-      "product_sku": "<sku>",
-      "invalid_attributes": [
-        {"attribute": "<name>", "issue": "<description>"}
-      ],
-      "passed_checks": ["<check1>", "<check2>"],
-      "failed_checks": ["<check1>", "<check2>"],
-      "category_validation": {"p1_p2_p3_correct": true, "issues": []},
-      "variant_validation": {"unique_combinations": true, "issues": []},
-      "brand_validation": {"consistent": true, "issues": []},
-      "vendor_rejection": {"rejected": false, "reason": ""},
-      "ai_comments": "<detailed reasoning, point by point covering all validations>"
-    }
+  "mirakl_product_id": "<id>",
+  "product_sku": "<sku>",
+  "invalid_attributes": [
+    {"attribute": "<name>", "issue": "<description>"}
   ],
-  "summary": {
-    "total_products": <number>,
-    "fully_compliant": <number>,
-    "partially_compliant": <number>,
-    "non_compliant": <number>,
-    "rejected_by_vendor": <number>
-  }
+  "rule_results": [
+    {"rule": "...", "passed": true, "observation": "..."}
+  ],
+  "category_validation": {"p1_p2_p3_correct": true, "issues": []},
+  "variant_validation": {"unique_combinations": true, "issues": []},
+  "brand_validation": {"consistent": true, "issues": []},
+  "vendor_rejection": {"rejected": false, "reason": ""}
 }
 """,
         output_key='attribute_validation_json'

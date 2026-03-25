@@ -106,6 +106,8 @@ Each image is preceded by a text label: [Product ID: <id> | image_type: main|alt
 
 ## STEP 1 — Compliance Rules (already in state)
 Use the compliance rules exactly as provided — do NOT call any tool to re-fetch them.
+Respect rule scope: if a rule is marked or described as category-specific (applies only to certain P1/P2/P3, Ready to Wear, Lifestyle, or other specific groups), 
+apply it only when the product clearly falls into that category. Do not generalise category-specific rules to all products.
 
 {compliance_search_result}
 
@@ -123,6 +125,8 @@ For each injected image, visually inspect it against every compliance rule from 
 - Background rules: Ready to Wear must have white background (some deviation from 1:1 aspect ratio allowed); Lifestyle can have non-white background but must be 1:1 aspect ratio
 - Brand consistency in images (no conflicting brands)
 - For variants: image logically matches supplied color
+- PR and Legal requirements applicable to imagery (for example, any warranty or marketing text visible in the image must comply with allowed language and must not include prohibited legal/marketing claims)
+- Spelling correctness for any visible text in the images (including product titles, descriptions, labels, or marketing copy shown in the image). Flag obvious spelling mistakes as issues.
 
 ## STEP 4 — Return aggregated results
 
@@ -145,11 +149,6 @@ Return ONLY valid JSON. No extra text. Format:
             "details": "..."
         }
     ],
-    "summary": {
-        "total": 3,
-        "compliant": 2,
-        "non_compliant": 1
-    },
     "compliance_rules_applied": ["..."]
 }
 ''',

@@ -6,8 +6,6 @@ from typing import Any
 from google.cloud import bigquery
 from google.adk.tools import FunctionTool
 
-from ..models import ValidationRecord
-
 # Singleton client instance
 _bq_client: bigquery.Client | None = None
 
@@ -51,24 +49,16 @@ def write_to_bigquery(
     if not isinstance(confidence_score_json, dict):
         return {"status": "error", "message": "confidence_score_json must be a JSON object"}
 
-    results = confidence_score_json.get("results", [])
-    if not isinstance(results, list):
-        return {"status": "error", "message": "confidence_score_json.results must be a list"}
+    if not confidence_score_json.get("mirakl_product_id"):
+        return {"status": "error", "message": "No valid product data found in confidence_score_json"}
 
-    rows = []
-    for item in results:
-        if not isinstance(item, dict):
-            continue
-        rows.append({
-            "mirakl_product_id": item.get("mirakl_product_id"),
-            "status": item.get("status"),
-            "confidence_score": item.get("confidence_score"),
-            "validation_decision":item.get("validation_decision"),
-            "ai_comment": item.get("ai_comment"),
-        })
-
-    if not rows:
-        return {"status": "error", "message": "No valid rows found in confidence_score_json.results"}
+    rows = [{
+        "mirakl_product_id": confidence_score_json.get("mirakl_product_id"),
+        "status": confidence_score_json.get("status"),
+        "confidence_score": confidence_score_json.get("confidence_score"),
+        "validation_decision": confidence_score_json.get("validation_decision"),
+        "ai_comment": confidence_score_json.get("ai_comment"),
+    }]
 
     try:
         client = _get_bigquery_client()

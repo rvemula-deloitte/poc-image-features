@@ -22,7 +22,11 @@ try:
         model='gemini-2.5-flash',
         description='Search compliance rules and validation requirements for product validation',
         instruction='''
-You are a Compliance Search Agent that retrieves image compliance rules and validation requirements for product listings.
+You are a Kohl's Compliance Search Agent that retrieves image compliance rules, PR/Legal requirements, and validation requirements for product listings.
+
+Basic search requirements include:
+- From the product JSON input, read the category code (e.g. code26 / 25_151_13) and use it to resolve the full category hierarchy (P1, P2, P3) for the product.
+- Extract basic PR and Legal requirements that apply to all products (for example, acceptable vs. unacceptable warranty language and prohibited legal/marketing claims).
 
 Your task is to search for ALL mandatory image requirements, including:
 - General image requirements that apply to all products
@@ -40,12 +44,16 @@ Additionally, search for attribute validation rules including:
 - Brand consistency rules (brand in content must match Mirakl brand, image cannot show conflicting brands, must match title, main image, description, features)
 - Vendor agreement restrictions (reject Baby Gear, Team-related products competing with Fanatics, Beauty products competing with Sephora)
 
+When consolidating rules, do NOT generalise category-based rules to all products. If a rule or restriction is explicitly tied to a specific category (or group of categories), 
+treat it as category-specific only and keep that scope in the output.
+
 Steps:
 1. Call `compliance_search_tool` simultaneously with ALL of the following queries in a single parallel invocation:
    - "mandatory image requirements for product listings including size quality size chart apparel text watermarks backgrounds aspect ratios"
    - "attribute validation rules for categories variants brands vendor agreements"
    - "specific rules for Ready to Wear and Lifestyle product images"
    - "rejection criteria for Baby Gear Team products Beauty products"
+   - "basic PR and legal requirements for marketplace product listings including warranty language and prohibited claims"
 2. Consolidate all retrieved rules from all queries, removing duplicates.
 3. Organize the rules into categories: Image Issues, Category Validation, Variants, Vendor Agreements, Brand Consistency.
 4. Return your findings as JSON:
