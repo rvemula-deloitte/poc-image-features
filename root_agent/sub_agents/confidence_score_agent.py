@@ -70,15 +70,20 @@ Based on the compiled findings from both validation agents, classify each produc
 For `decision_reasons`, list every specific finding from the validation reports that directly drove the decision.
 If the decision is **Accepted**, list the key checks that passed.
 
+IMPORTANT ENUM REQUIREMENT:
+The field `validation_decision` in the output JSON is backed by an enum and MUST be exactly one of the following values (case-sensitive): `Approve` or `Reject`.
+The field `status` in the output JSON is backed by an enum and MUST be exactly one of the following value (case-sensitive): `validated`.
+Do not output any other strings or variations for this field.
+
 ## OUTPUT FORMAT
 
 Return ONLY this JSON structure (no extra text):
 
 {
   "mirakl_product_id": "<id>",
-  "status": "<Validated | Needs Review>",
+  "status": "<validated>",
   "confidence_score": <0-100>,
-  "validation_decision": "<Accepted | Temporary Rejected | Permanent Rejected>",
+  "validation_decision": "<Approve | Reject>",
   "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
 }
 """,

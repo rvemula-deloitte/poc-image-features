@@ -65,7 +65,7 @@ Steps:
             "rule_type": "<type of rule, e.g. dimensions, format, background, variants, brands>",
             "requirement": "<specific requirement>",
             "applies_to": "<all products | specific category | Ready to Wear | Lifestyle>",
-            "references": "<relevant chunks or sources from datastore>"
+            "references": "<small relevant chunks or sources from search results that support this rule>"
         }
     ],
     "summary": "<brief summary of the compliance rules retrieved covering all categories>"

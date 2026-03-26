@@ -23,8 +23,7 @@ def _extract_image_url(img_obj: dict) -> Optional[str]:
     """Return the best available URL from a Mirakl image object."""
     if not isinstance(img_obj, dict):
         return None
-    # Prefer original_url (source CDN); fall back to mirakl-hosted source
-    return img_obj.get("original_url") or img_obj.get("source") or None
+    return img_obj.get("source") or img_obj.get("original_url") or None
 
 
 def _inject_product_images(
@@ -104,6 +103,9 @@ You are an image validation agent.
 The product images have been injected directly into this conversation as inline image parts.
 Each image is preceded by a text label: [Product ID: <id> | image_type: main|alternate | url: <url>]
 
+In the product JSON, image objects are provided under `data.main_image` and `data.alt_image_*` with fields `source` and `original_url`. 
+Always use the `source` URL as the primary URL for validation and tool calls (such as `get_image_dimensions_tool`), only falling back to `original_url` if `source` is missing.
+
 ## STEP 1 — Compliance Rules (already in state)
 Use the compliance rules exactly as provided — do NOT call any tool to re-fetch them.
 Respect rule scope: if a rule is marked or described as category-specific (applies only to certain P1/P2/P3, Ready to Wear, Lifestyle, or other specific groups), 
@@ -112,7 +114,7 @@ apply it only when the product clearly falls into that category. Do not generali
 {compliance_search_result}
 
 ## STEP 2 — Dimensions
-For every image URL labelled above, call `get_image_dimensions_tool` with that URL
+For every image URL labelled above, call `get_image_dimensions_tool` with that URL (using the `source` URL)
 to get exact pixel width, height, and format.
 
 ## STEP 3 — Visual Compliance Check
