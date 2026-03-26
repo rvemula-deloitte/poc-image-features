@@ -414,16 +414,4 @@ flowchart TD
 
 ---
 
-## 12. Known Gaps and Next Steps
 
-- ValidationRecord model is not integrated into the active write flow; current BigQuery schema writes a compact row with 5 fields. If a denormalized/flattened schema is desired, integrate `ValidationRecord.to_bq_row()` or extend `write_to_bigquery`.
-- Attribute agent currently does not call Vertex AI Search directly (tool lines commented out). If live attribute rule retrieval is needed per product type, consider enabling/configuring the tool similar to ComplianceSearchAgent.
-- Testing:
-  - Add unit tests for `bigquery_write_tool.write_to_bigquery` (success and error paths) by monkeypatching `_get_bigquery_client`.
-  - Add end-to-end test scaffolding for the root pipeline using stubbed tools and static session state.
-- Observability:
-  - Consider structured logging around state transitions and tool I/O for traceability.
-- Configuration unification:
-  - Ensure consistent use of `GOOGLE_CLOUD_PROJECT` across all components and document ADC expectations (service account vs user creds).
-
----
