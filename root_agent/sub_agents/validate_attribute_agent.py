@@ -36,9 +36,9 @@ apply it only to products in that category. Do not treat category-specific rules
 ## STEP 2: Validate Each Product's Attributes
 
 For every product in products_data, check:
-2. **Product-Type Rules** — Do the attributes satisfy category/type-specific requirements?
+2. **Product-Type Rules** — Do the attributes satisfy category/type-specific requirements? For example, if prop_65 is present, it must be "Yes" or "No"; if "No", there should be no prop_65_warning_copy provided.
 3. **Data Quality** — Are values well-formed, within expected ranges, or properly formatted?
-4. **Missing / Empty Fields** — List every attribute that is absent or blank.
+3. **Missing / Empty Fields** — From the compliance_rules where category is "Required Attributes", identify required attributes for the product's category/type. List every required attribute that is absent or blank, EXCEPT for 'prop_65' which should not be flagged as missing (only validate if present).
 5. **Category Validation** — Is P1:P2:P3 logically correct based on title, description, features, and other non-image attributes?
 6. **Variants** — Each variant has unique color/size, grouped by color, sizes unique within color, sizes != '000'. You may validate that the declared fields (such as color names) are logically consistent.
 7. **Brand Consistency** — Brand in textual content and attributes matches Mirakl brand. Do not validate brands inside the images; that is handled by image validation.

@@ -39,6 +39,7 @@ Your task is to search for ALL mandatory image requirements, including:
 - Requirements for images to clearly show the item being sold and match the title
 
 Additionally, search for attribute validation rules including:
+- Required attributes for each product type (e.g., prop_65 for product type 3_14_63, choking_hazard for all, etc.)
 - Category hierarchy validation (P1:P2:P3 logical correctness based on image, title, description, features)
 - Variant grouping rules (unique color and size combinations, grouped by color, sizes unique within color, sizes cannot be '000', image must match supplied color)
 - Brand consistency rules (brand in content must match Mirakl brand, image cannot show conflicting brands, must match title, main image, description, features)
@@ -50,12 +51,13 @@ treat it as category-specific only and keep that scope in the output.
 Steps:
 1. Call `compliance_search_tool` simultaneously with ALL of the following queries in a single parallel invocation:
    - "mandatory image requirements for product listings including size quality size chart apparel text watermarks backgrounds aspect ratios"
+   - "required attributes for each product type including prop_65 choking_hazard containsPFAS perishable_indicator is_ltl_item"
    - "attribute validation rules for categories variants brands vendor agreements"
    - "specific rules for Ready to Wear and Lifestyle product images"
    - "rejection criteria for Baby Gear Team products Beauty products"
    - "basic PR and legal requirements for marketplace product listings including warranty language and prohibited claims"
 2. Consolidate all retrieved rules from all queries, removing duplicates.
-3. Organize the rules into categories: Image Issues, Category Validation, Variants, Vendor Agreements, Brand Consistency.
+4. Organize the rules into categories: Image Issues, Required Attributes, Category Validation, Variants, Vendor Agreements, Brand Consistency.
 4. Return your findings as JSON:
 
 {
