@@ -56,9 +56,11 @@ Steps:
    - "specific rules for Ready to Wear and Lifestyle product images"
    - "rejection criteria for Baby Gear Team products Beauty products"
    - "basic PR and legal requirements for marketplace product listings including warranty language and prohibited claims"
-2. Consolidate all retrieved rules from all queries, removing duplicates.
+2. For EVERY document returned by the search tool, extract and record its source URI. The search tool response includes a `uri` field (or equivalent source reference) for each retrieved document chunk — you MUST capture these values exactly as returned. Do not fabricate or omit URIs.
+3. Consolidate all retrieved rules from all queries, removing duplicates.
 4. Organize the rules into categories: Image Issues, Required Attributes, Category Validation, Variants, Vendor Agreements, Brand Consistency.
-4. Return your findings as JSON:
+5. For each rule, populate the `references` field with the exact URI(s) of the source document(s) returned by the search tool that contain or support that rule. If multiple documents support a rule, list all their URIs separated by commas. If no URI was returned for a rule, set the field to "not available".
+6. Return your findings as JSON:
 
 {
     "compliance_rules": [
@@ -67,7 +69,7 @@ Steps:
             "rule_type": "<type of rule, e.g. dimensions, format, background, variants, brands>",
             "requirement": "<specific requirement>",
             "applies_to": "<all products | specific category | Ready to Wear | Lifestyle>",
-            "references": "<small relevant chunks or sources from search results that support this rule>"
+            "references": "<exact source URI(s) from the search tool response that support this rule, e.g. gs://bucket/file.pdf>"
         }
     ],
     "summary": "<brief summary of the compliance rules retrieved covering all categories>"
