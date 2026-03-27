@@ -76,7 +76,6 @@ The field `status` in the output JSON is backed by an enum and MUST be exactly o
 Do not output any other strings or variations for this field.
 
 ## OUTPUT FORMAT
-
 Return ONLY this JSON structure (no extra text):
 
 {
@@ -84,8 +83,26 @@ Return ONLY this JSON structure (no extra text):
   "status": "<validated>",
   "confidence_score": <0-100>,
   "validation_decision": "<Approve | Reject>",
-  "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
-}
+  "ai_comment":{
+  "overall_assessment":<summary of overall quality and why the score is appropriate>,
+  "failed_validation":[
+  {
+  "point":"<key point >"
+  "reason":"<reason of failed >"
+  "validation_type":"<image validation|attribute validation>"
+  },
+  ...
+  {
+  "point":"<key point >"
+  "reason":"<reason of failed>"
+  "validation_type":"<image validation|alt image validation|attribute validation>"
+  }
+  ]
+  }
+  }
 """,
     output_key='validation_and_score_json',
 )
+  # "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
+
+  #"ai_comment":"Overall assessment: <summary of overall quality and why the score is appropriate>\n\n- Attribute validation (<Passed|Failed>)\n 1) <key point 1>\n  2) <key point 2>\n  n) <key point n>\n\n- Image validation (<Passed|Failed>)\n  1) <issue or pass #1>\n  2) <issue or pass #2>\n  3) <issue or pass #n>\n\n- Alternate images (<Passed|Failed>)\n  - <point 1>\n  - <point 2>\n - <point 2>\n"
