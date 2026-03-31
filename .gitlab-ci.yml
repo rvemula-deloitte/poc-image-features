@@ -1,0 +1,114 @@
+# GitLab CI/CD to deploy the ADK application to GCP Agent Engine using the ADK CLI
+# Auth supports either:
+#  - Keyless: Workload Identity Federation (preferred)
+#  - Keyed: GOOGLE_APPLICATION_CREDENTIALS_JSON (fallback)
+#
+# This pipeline does NOT build a container. It uses `adk engine deploy`, which packages
+# the ADK app as defined in [tool.adk] of pyproject.toml and deploys it to Agent Engine.
+
+image: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+
+stages:
+  - deploy
+
+# Global variables (override in GitLab UI)
+variables:
+  # GCP project and region for Agent Engine
+  PROJECT_ID: ""
+  REGION: "us-central1"
+
+  # Agent Engine resource
+  ENGINE_NAME: "product-validation-engine"
+
+  # Runtime Service Account (attached to Agent Engine runtime)
+  RUNTIME_SA_EMAIL: ""
+
+  # Runtime configuration passed to the engine (matches code)
+  BQ_DATASET: "poc_product_intake"
+  BQ_TABLE: "validated_product_details"
+  GOOGLE_CLOUD_LOCATION: "us"  # Vertex/DiscoveryEngine default region for tools
+  # GOOGLE_API_KEY: "<set in CI/CD variables (masked, protected)>"
+
+  # Authentication (choose ONE method)
+  # 1) KEYLESS (recommended): Workload Identity Federation
+  #    - Set these in CI/CD variables at Group/Project level
+  # GOOGLE_WORKLOAD_IDENTITY_PROVIDER: "projects/1234567890/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab"
+  # GOOGLE_SERVICE_ACCOUNT_EMAIL: "gitlab-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+  # PROJECT_NUMBER: "1234567890"
+  #
+  # 2) KEYED (fallback): Service Account JSON key (masked, protected)
+  # GOOGLE_APPLICATION_CREDENTIALS_JSON: "<json contents>"
+
+.default_rules:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: on_success
+
+deploy_agent_engine:
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH
+  before_script:
+    - set -euxo pipefail
+
+    - echo "==> Authenticating to Google Cloud"
+    # Prefer WIF if configured; else fall back to key JSON
+    - |
+      if [ -n "${GOOGLE_WORKLOAD_IDENTITY_PROVIDER:-}" ] && [ -n "${GOOGLE_SERVICE_ACCOUNT_EMAIL:-}" ]; then
+        echo "Using Workload Identity Federation (keyless)"
+        gcloud iam workload-identity-pools create-cred-config \
+          "$GOOGLE_WORKLOAD_IDENTITY_PROVIDER" \
+          --service-account="$GOOGLE_SERVICE_ACCOUNT_EMAIL" \
+          --output-file=/tmp/wif-cred.json
+        gcloud auth login --cred-file=/tmp/wif-cred.json
+      elif [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ]; then
+        echo "Using Service Account JSON key (fallback)"
+        printf "%s" "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/key.json
+        gcloud auth activate-service-account --key-file=/tmp/key.json
+      else
+        echo "No authentication configured. Set GOOGLE_WORKLOAD_IDENTITY_PROVIDER + GOOGLE_SERVICE_ACCOUNT_EMAIL (preferred), or GOOGLE_APPLICATION_CREDENTIALS_JSON." >&2
+        exit 1
+      fi
+
+    - echo "==> Configuring gcloud"
+    - gcloud config set project "$PROJECT_ID"
+    - gcloud config set compute/region "$REGION"
+
+    - echo "==> Enabling required APIs (idempotent; ignore non-existent services)"
+    - |
+      gcloud services enable \
+        iam.googleapis.com \
+        iamcredentials.googleapis.com \
+        serviceusage.googleapis.com \
+        bigquery.googleapis.com \
+        discoveryengine.googleapis.com || true
+      # Agent Engine service name may vary by environment; attempt enable and ignore failure
+      gcloud services enable adkengine.googleapis.com || true
+
+    - echo "==> Installing ADK CLI"
+    - apt-get update && apt-get install -y --no-install-recommends python3-pip ca-certificates && rm -rf /var/lib/apt/lists/*
+    - pip3 install --upgrade pip
+    - pip3 install "google-adk>=0.3.0"
+
+  script:
+    - echo "==> Deploying to Agent Engine: $ENGINE_NAME"
+    - chmod +x scripts/deploy_agent_engine.sh
+    - |
+      PROJECT_ID="$PROJECT_ID" \
+      REGION="$REGION" \
+      ENGINE_NAME="$ENGINE_NAME" \
+      RUNTIME_SA_EMAIL="$RUNTIME_SA_EMAIL" \
+      BQ_DATASET="${BQ_DATASET}" \
+      BQ_TABLE="${BQ_TABLE}" \
+      GOOGLE_CLOUD_LOCATION="${GOOGLE_CLOUD_LOCATION}" \
+      GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
+      ./scripts/deploy_agent_engine.sh
+
+  environment:
+    name: production
+  artifacts:
+    when: on_failure
+    reports:
+      dotenv:
+        - .env  # Optional if you output derived vars for debugging
+  tags: []
