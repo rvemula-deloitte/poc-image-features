@@ -7,6 +7,40 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class ConfidenceScoreRecord(BaseModel):
+    """Typed representation of the confidence score agent output written to BigQuery."""
+
+    mirakl_product_id: str = Field(description="Unique product identifier from Mirakl")
+    status: str = Field(description="Processing status — must be 'validated'")
+    confidence_score: float = Field(description="AI-assigned quality score from 0 to 100")
+    validation_decision: str = Field(description="Final decision — 'Approve' or 'Reject'")
+    ai_comment: str = Field(description="Point-by-point reasoning behind the score and decision")
+    variant_group_code: str | None = Field(default=None, description="VGC code (style_number) grouping product variants")
+    brand: str | None = Field(default=None, description="Product brand")
+    title: str | None = Field(default=None, description="Product title")
+    description: str | None = Field(default=None, description="Product description")
+    size: str | None = Field(default=None, description="Product size variant")
+    colour: str | None = Field(default=None, description="Product colour variant")
+    seller: str | None = Field(default=None, description="Seller identifier from sources[0].provider_code")
+
+    def to_bq_row(self) -> dict[str, Any]:
+        """Return a flat dict ready for BigQuery insert_rows_json."""
+        return {
+            "mirakl_product_id": self.mirakl_product_id,
+            "status":            self.status,
+            "confidence_score":  self.confidence_score,
+            "validation_decision": self.validation_decision,
+            "ai_comment":        self.ai_comment,
+            "variant_group_code": self.variant_group_code,
+            "brand":             self.brand,
+            "title":             self.title,
+            "description":       self.description,
+            "size":              self.size,
+            "colour":            self.colour,
+            "seller":            self.seller,
+        }
+
+
 class ValidationRecord(BaseModel):
     """Validation record to be stored in BigQuery."""
 
