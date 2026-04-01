@@ -7,13 +7,13 @@ confidence_score_agent = LlmAgent(
     name='ConfidenceScoreAgent',
     model='gemini-2.5-flash',
     description=(
-        "Aggregates attribute validation results and image validation results "
-        "to produce a final per-product confidence score and summary."
+        "Aggregates attribute validation results, image validation results, and "
+        "VGC duplicate check results to produce a final per-product confidence score and summary."
     ),
     instruction="""
 You are a Product Confidence Scoring Agent.
 
-You have access to two validation reports already stored in the session state:
+You have access to the following reports already stored in the session state:
 
 1. **Attribute Validation Results** (`attribute_validation_json`):
 {attribute_validation_json}
@@ -21,7 +21,32 @@ You have access to two validation reports already stored in the session state:
 2. **Image Validation Results** (`image_validation_json`):
 {image_validation_json}
 
+3. **VGC Duplicate Check Result** (`vgc_check_result`):
+{vgc_check_result}
+
+4. product data from context
+
 ## Your Task
+
+### STEP 1 — VGC Duplicate Check (evaluate FIRST — overrides all other scoring)
+
+Read the findings from `vgc_check_result`:
+
+- **`cross_vgc_check.matches_found` > 0**: The same seller has submitted a product with identical
+  brand and title under a different VGC code.
+  → Then set `validation_decision` = `Reject`.
+  → `ai_comment` must start with: "REJECTED — Cross-VGC duplicate: <cross_vgc_check.observation>"
+  → Skip Steps 2 and 3. Go directly to output.
+
+- **`intra_vgc_check.duplicate_found` = `true`**: An identical variant (same VGC + same size + same colour)
+  already exists in the system.
+  → Then set `validation_decision` = `Reject`. 
+  → `ai_comment` must start with: "REJECTED — Intra-VGC exact duplicate: <intra_vgc_check.observation>"
+  → Skip Steps 2 and 3. Go directly to output.
+
+- **Both checks return 0 matches**: No VGC issues found. Continue to Step 2.
+
+### STEP 2 — Quality Scoring
 
 Read both validation reports thoroughly and generate a confidence score using your own judgment.
 
@@ -70,6 +95,17 @@ Based on the compiled findings from both validation agents, classify each produc
 For `decision_reasons`, list every specific finding from the validation reports that directly drove the decision.
 If the decision is **Accepted**, list the key checks that passed.
 
+### STEP 3 — Extract identity fields from products_data
+
+From `products_data` extract to include in output:
+- `variant_group_code` → `data.style_number`
+- `brand` → `data.brand`
+- `title` → `data.title`
+- `description` → `data.meta_description`
+- `size` → `data.nrf_size`
+- `colour` → `data.display_color`
+- `seller` → `sources[0].provider_code`
+
 IMPORTANT ENUM REQUIREMENT:
 The field `validation_decision` in the output JSON is backed by an enum and MUST be exactly one of the following values (case-sensitive): `Approve` or `Reject`.
 The field `status` in the output JSON is backed by an enum and MUST be exactly one of the following value (case-sensitive): `validated`.
@@ -81,10 +117,17 @@ Return ONLY this JSON structure (no extra text):
 
 {
   "mirakl_product_id": "<id>",
-  "status": "<validated>",
+  "status": "validated",
   "confidence_score": <0-100>,
   "validation_decision": "<Approve | Reject>",
-  "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
+  "ai_comment": "<point-by-point: vgc check outcome, attribute issues, image issues, overall reasoning>",
+  "variant_group_code": "<style_number from products_data or null>",
+  "brand": "<brand or null>",
+  "title": "<product title or null>",
+  "description": "<product description or null>",
+  "size": "<size or null>",
+  "colour": "<colour extracted from products_data variant attributes or null>",
+  "seller": "<sources[0].provider_code or null>"
 }
 """,
     output_key='validation_and_score_json',
