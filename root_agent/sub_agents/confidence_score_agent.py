@@ -21,8 +21,8 @@ You have access to the following reports already stored in the session state:
 2. **Image Validation Results** (`image_validation_json`):
 {image_validation_json}
 
-3. **VGC Duplicate Check Result** (`vgc_check_result`):
-{vgc_check_result}
+3. **VGC Duplicate Check Result** (`vgc_validation_json`):
+{vgc_validation_json}
 
 4. product data from context
 
@@ -30,7 +30,7 @@ You have access to the following reports already stored in the session state:
 
 ### STEP 1 — VGC Duplicate Check (evaluate FIRST — overrides all other scoring)
 
-Read the findings from `vgc_check_result`:
+Read the findings from `vgc_validation_json`:
 
 - **`cross_vgc_check.matches_found` > 0**: The same seller has submitted a product with identical
   brand and title under a different VGC code.
@@ -120,14 +120,7 @@ Return ONLY this JSON structure (no extra text):
   "status": "validated",
   "confidence_score": <0-100>,
   "validation_decision": "<Approve | Reject>",
-  "ai_comment": "<point-by-point: vgc check outcome, attribute issues, image issues, overall reasoning>",
-  "variant_group_code": "<style_number from products_data or null>",
-  "brand": "<brand or null>",
-  "title": "<product title or null>",
-  "description": "<product description or null>",
-  "size": "<size or null>",
-  "colour": "<colour extracted from products_data variant attributes or null>",
-  "seller": "<sources[0].provider_code or null>"
+  "ai_comment": "<point-by-point: vgc check outcome, attribute issues, image issues, overall reasoning>"
 }
 """,
     output_key='validation_and_score_json',

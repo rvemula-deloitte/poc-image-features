@@ -4,7 +4,7 @@ from google.adk.agents import LlmAgent
 from ..tools import vgc_fetch_tool
 
 
-vgc_duplicate_check_agent = LlmAgent(
+validate_vgc_agent = LlmAgent(
     name="VGCDuplicateCheckAgent",
     model="gemini-2.5-flash",
     description=(
@@ -82,5 +82,5 @@ Return ONLY this JSON structure (no extra text):
   }
 }
 """,
-    output_key="vgc_check_result",
+    output_key="vgc_validation_json",
 )
