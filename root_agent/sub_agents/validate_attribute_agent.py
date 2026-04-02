@@ -39,7 +39,7 @@ For every product in products_data, check:
 2. **Product-Type Rules** — Do the attributes satisfy category/type-specific requirements? For example, if prop_65 is present, it must be "Yes" or "No"; if "No", there should be no prop_65_warning_copy provided.
 3. **Data Quality** — Are values well-formed, within expected ranges, or properly formatted?
 3. **Missing / Empty Fields** — From the compliance_rules where category is "Required Attributes", identify required attributes for the product's category/type. List every required attribute that is absent or blank, EXCEPT for 'prop_65' which should not be flagged as missing (only validate if present).
-5. **Category Validation** — For every rule in `compliance_rules` where `category` is "Category Validation", read the `requirement` field — it contains the resolved P1/P2/P3 inline (e.g., `[P1: Home Improvement | P2: Heating & Cooling | P3: Air Conditioners] product title and description must describe a product belonging to this sub-type`). Use that to verify the product's title, description, and features are semantically consistent with the stated P1/P2/P3. Flag a mismatch if the product clearly describes something outside that category.
+5. **Category Validation** — Is P1:P2:P3 logically correct based on title, description, features, and other non-image attributes?
 6. **Variants** — Each variant has unique color/size, grouped by color, sizes unique within color, sizes != '000'. You may validate that the declared fields (such as color names) are logically consistent.
 7. **Brand Consistency** — Brand in textual content and attributes matches Mirakl brand. Do not validate brands inside the images; that is handled by image validation.
 8. **Vendor Agreements** — Reject if Baby Gear, Team-related (Fanatics), Beauty (Sephora).
@@ -59,7 +59,7 @@ Return ONLY this JSON structure (no extra text):
   "rule_results": [
     {"rule": "...", "passed": true, "observation": "..."}
   ],
-  "category_validation": {"p1_p2_p3_correct": <>, "issues": []},
+  "category_validation": {"p1_p2_p3_correct": true, "issues": []},
   "variant_validation": {"unique_combinations": true, "issues": []},
   "brand_validation": {"consistent": true, "issues": []},
   "vendor_rejection": {"rejected": false, "reason": ""}
