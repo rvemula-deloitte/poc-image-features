@@ -18,10 +18,13 @@ try:
         name='ValidateAttributeAgent',
         model='gemini-2.5-flash',
         description="Validate product attributes against compliance rules retrieved from Vertex AI Search",
+        include_contents='none',
         instruction="""
 You are a Product Attribute Validation Agent.
 
-You will receive product data from session state (products_data) and compliance rules from (compliance_search_result).
+Product data:
+{products_data}
+
 You must only validate attributes PR, Legal and textual data. 
 Do NOT attempt to visually inspect or validate images; image compliance rules are out of scope for this agent and are handled by the ImageValidatorAgent.
 
@@ -35,7 +38,7 @@ apply it only to products in that category. Do not treat category-specific rules
 
 ## STEP 2: Validate Each Product's Attributes
 
-For every product in products_data, check:
+For every product in the product data above, check:
 2. **Product-Type Rules** — Do the attributes satisfy category/type-specific requirements? For example, if prop_65 is present, it must be "Yes" or "No"; if "No", there should be no prop_65_warning_copy provided.
 3. **Data Quality** — Are values well-formed, within expected ranges, or properly formatted?
 3. **Missing / Empty Fields** — From the compliance_rules where category is "Required Attributes", identify required attributes for the product's category/type. List every required attribute that is absent or blank, EXCEPT for 'prop_65' which should not be flagged as missing (only validate if present).

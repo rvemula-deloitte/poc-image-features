@@ -43,6 +43,14 @@ def _inject_product_images(
     Each image is preceded by a descriptive text label so the agent can
     reference it by product ID and image type.
     """
+    # Skip injection on tool-response turns — images were already injected on the first call
+    if llm_request.contents and any(
+        getattr(p, "function_response", None)
+        for content in llm_request.contents
+        for p in (getattr(content, "parts", None) or [])
+    ):
+        return None
+
     state = callback_context.state
     raw = state.get("products_data", "[]")
     try:
@@ -97,6 +105,7 @@ validate_image_agent = LlmAgent(
     model='gemini-2.5-flash',
     description='Validate all product images (main + alternate) directly via Gemini vision using Part.from_uri',
     before_model_callback=_inject_product_images,
+    include_contents='none',
     instruction='''
 You are an image validation agent.
 
@@ -114,8 +123,8 @@ apply it only when the product clearly falls into that category. Do not generali
 {compliance_search_result}
 
 ## STEP 2 — Dimensions
-For every image URL labelled above, call `get_image_dimensions_tool` with that URL (using the `source` URL)
-to get exact pixel width, height, and format.
+Call `get_image_dimensions_tool` for ALL image URLs in parallel — issue one tool call per image simultaneously in a single parallel invocation, not sequentially.
+Pass each image's `source` URL (falling back to `original_url` if `source` is missing) as the `url` argument.
 
 ## STEP 3 — Visual Compliance Check
 For each injected image, visually inspect it against every compliance rule from Step 1, including:

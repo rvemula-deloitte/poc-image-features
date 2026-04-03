@@ -10,11 +10,14 @@ confidence_score_agent = LlmAgent(
         "Aggregates attribute validation results and image validation results "
         "to produce a final per-product confidence score and summary."
     ),
+    include_contents='none',
     instruction="""
 You are a Product Confidence Scoring Agent.
 
 You have access to two validation reports already stored in the session state:
 
+for product: {products_data}
+get,
 1. **Attribute Validation Results** (`attribute_validation_json`):
 {attribute_validation_json}
 

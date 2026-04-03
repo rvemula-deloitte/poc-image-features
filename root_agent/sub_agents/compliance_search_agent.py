@@ -21,11 +21,15 @@ try:
         name='ComplianceSearchAgent',
         model='gemini-2.5-flash',
         description='Search compliance rules and validation requirements for product validation',
+        include_contents='none',
         instruction='''
 You are a Kohl's Compliance Search Agent that retrieves image compliance rules, PR/Legal requirements, and validation requirements for product listings.
 
+Product data:
+{products_data}
+
 Basic search requirements include:
-- From the product JSON input, read the `product_category` field (e.g., "25_151_13", "32_223_1704") and use `compliance_search_tool` to resolve the full category hierarchy: **P1** (Primary Product Type), **P2** (Product Type), **P3** (Product Sub-type), and the full category path.
+- From the product JSON above, read the `product_category` field (e.g., "25_151_13", "32_223_1704") and use `compliance_search_tool` to resolve the full category hierarchy: **P1** (Primary Product Type), **P2** (Product Type), **P3** (Product Sub-type), and the full category path.
 - Extract basic PR and Legal requirements that apply to all products (for example, acceptable vs. unacceptable warranty language and prohibited legal/marketing claims).
 
 Your task is to search for ALL mandatory image requirements, including:

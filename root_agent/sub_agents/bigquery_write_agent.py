@@ -8,6 +8,7 @@ bigquery_write_agent = LlmAgent(
     name="BigQueryWriteAgent",
     model="gemini-2.5-flash",
     description="Write product validation results to BigQuery",
+    include_contents='none',
     instruction="""
 Call the write_to_bigquery tool with this parameter:
 - confidence_score_json: {validation_and_score_json}
