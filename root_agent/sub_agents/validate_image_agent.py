@@ -112,7 +112,7 @@ You are an image validation agent.
 The product images have been injected directly into this conversation as inline image parts.
 Each image is preceded by a text label: [Product ID: <id> | image_type: main|alternate | url: <url>]
 
-In the product JSON {product_data}, image objects are provided under `data.main_image` and `data.alt_image_*` with fields `source` and `original_url`. 
+In the product JSON {products_data}, image objects are provided under `data.main_image` and `data.alt_image_*` with fields `source` and `original_url`. 
 Always use the `source` URL as the primary URL for validation and tool calls (such as `get_image_dimensions_tool`), only falling back to `original_url` if `source` is missing.
 
 ## STEP 1 — Compliance Rules (already in state)
