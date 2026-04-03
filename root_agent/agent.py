@@ -6,6 +6,7 @@ from google.adk.agents.callback_context import CallbackContext
 from .sub_agents.compliance_search_agent import compliance_search_agent
 from .sub_agents.validate_image_agent import validate_image_agent
 from .sub_agents.validate_attribute_agent import validate_attribute_agent
+from .sub_agents.vgc_duplicate_check_agent import vgc_duplicate_check_agent
 from .sub_agents.confidence_score_agent import confidence_score_agent
 from .sub_agents.bigquery_write_agent import bigquery_write_agent
 
@@ -19,13 +20,15 @@ def _store_product_data_in_state(callback_context: CallbackContext) -> None:
             callback_context.state["products_data"] = text
             break
 
-# Parallel agent: image validation + attribute validation run concurrently
+# Parallel agent: image validation + attribute validation + VGC duplicate check run concurrently
 validation_parallel_agent = ParallelAgent(
     name="validation_parallel_agent",
-    description="Runs image validation and attribute validation in parallel",
+    description="Runs image validation, attribute validation, and VGC duplicate check in parallel",
     sub_agents=[
-        validate_image_agent,      # -> image_validation_json
-        validate_attribute_agent,  # -> attribute_validation_json
+        validate_image_agent,        # -> image_validation_json
+        validate_attribute_agent,    # -> attribute_validation_json
+        # Need to change confidence score agent system prompt whn this is uncommented.
+        # vgc_duplicate_check_agent,   # -> vgc_check_result 
     ],
 )
 

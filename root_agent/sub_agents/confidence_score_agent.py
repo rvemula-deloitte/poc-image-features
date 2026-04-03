@@ -7,24 +7,28 @@ confidence_score_agent = LlmAgent(
     name='ConfidenceScoreAgent',
     model='gemini-2.5-flash',
     description=(
-        "Aggregates attribute validation results and image validation results "
-        "to produce a final per-product confidence score and summary."
+        "Aggregates attribute validation results, image validation results, and "
+        "VGC duplicate check results to produce a final per-product confidence score and summary."
     ),
     include_contents='none',
     instruction="""
 You are a Product Confidence Scoring Agent.
 
-You have access to two validation reports already stored in the session state:
+You have access to the following reports already stored in the session state:
 
-for product: {products_data}
-get,
 1. **Attribute Validation Results** (`attribute_validation_json`):
 {attribute_validation_json}
 
 2. **Image Validation Results** (`image_validation_json`):
 {image_validation_json}
 
+3. **Product Data** (`products_data`):
+{products_data}
+
+
 ## Your Task
+
+### STEP 1 — Quality Scoring
 
 Read both validation reports thoroughly and generate a confidence score using your own judgment.
 
@@ -73,6 +77,17 @@ Based on the compiled findings from both validation agents, classify each produc
 For `decision_reasons`, list every specific finding from the validation reports that directly drove the decision.
 If the decision is **Accepted**, list the key checks that passed.
 
+### STEP 2 — Extract identity fields from products_data
+
+From `products_data` extract to include in output:
+- `variant_group_code` → `data.style_number`
+- `brand` → `data.brand`
+- `title` → `data.title`
+- `description` → `data.meta_description`
+- `size` → `data.nrf_size`
+- `colour` → `data.display_color`
+- `seller` → `sources[0].provider_code`
+
 IMPORTANT ENUM REQUIREMENT:
 The field `validation_decision` in the output JSON is backed by an enum and MUST be exactly one of the following values (case-sensitive): `Approve` or `Reject`.
 The field `status` in the output JSON is backed by an enum and MUST be exactly one of the following value (case-sensitive): `validated`.
@@ -84,10 +99,17 @@ Return ONLY this JSON structure (no extra text):
 
 {
   "mirakl_product_id": "<id>",
-  "status": "<validated>",
+  "status": "validated",
   "confidence_score": <0-100>,
   "validation_decision": "<Approve | Reject>",
-  "ai_comment": "<combined reasoning: attribute issues, image issues, overall assessment — point by point>"
+  "ai_comment": "<point-by-point: vgc check outcome, attribute issues, image issues, overall reasoning>",
+  "variant_group_code": "<style_number from products_data or null>",
+  "brand": "<brand or null>",
+  "title": "<product title or null>",
+  "description": "<product description or null>",
+  "size": "<size or null>",
+  "colour": "<colour extracted from products_data variant attributes or null>",
+  "seller": "<sources[0].provider_code or null>"
 }
 """,
     output_key='validation_and_score_json',
