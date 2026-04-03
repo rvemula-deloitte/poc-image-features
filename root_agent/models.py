@@ -22,6 +22,7 @@ class ConfidenceScoreRecord(BaseModel):
     size: str | None = Field(default=None, description="Product size variant")
     colour: str | None = Field(default=None, description="Product colour variant")
     seller: str | None = Field(default=None, description="Seller identifier from sources[0].provider_code")
+    session_id: str | None = Field(default=None, description="Session identifier for the validation run")
 
     def to_bq_row(self) -> dict[str, Any]:
         """Return a flat dict ready for BigQuery insert_rows_json."""
@@ -38,6 +39,7 @@ class ConfidenceScoreRecord(BaseModel):
             "size":              self.size,
             "colour":            self.colour,
             "seller":            self.seller,
+            "session_id":        self.session_id,
         }
 
 

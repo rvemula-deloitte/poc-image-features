@@ -24,8 +24,8 @@ def _get_bigquery_client() -> bigquery.Client:
 def _get_table_id() -> str:
     """Get fully qualified BigQuery table ID."""
     project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    dataset = os.getenv("BQ_DATASET", "product_validation")
-    table = os.getenv("BQ_TABLE", "validation_results")
+    dataset = os.getenv("BQ_DATASET")
+    table = os.getenv("BQ_TABLE")
     return f"{project_id}.{dataset}.{table}"
 
 
