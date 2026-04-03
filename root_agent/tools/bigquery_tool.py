@@ -22,8 +22,8 @@ def _get_bigquery_client() -> bigquery.Client:
 def _get_table_id() -> str:
     """Get fully qualified BigQuery table ID."""
     project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    dataset = os.getenv("BQ_DATASET", "product_validation")
-    table = os.getenv("BQ_TABLE", "validation_results")
+    dataset = os.getenv("BQ_DATASET")
+    table = os.getenv("BQ_TABLE")
     return f"{project_id}.{dataset}.{table}"
 
 
@@ -58,6 +58,7 @@ def write_to_bigquery(
         "confidence_score": confidence_score_json.get("confidence_score"),
         "validation_decision": confidence_score_json.get("validation_decision"),
         "ai_comment": confidence_score_json.get("ai_comment"),
+        "session_id":confidence_score_json.get("session_id")
     }]
 
     try:
