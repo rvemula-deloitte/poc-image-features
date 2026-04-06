@@ -1,42 +1,77 @@
 # POC Image Features - Product Validation Pipeline
 
-AI Agent using Google ADK for product validation and BigQuery integration.
+AI-powered multi-agent product validation pipeline built on Google Agent Development Kit (ADK). The pipeline validates Mirakl product listings against Kohl's compliance rules, produces a confidence score with an Approve/Reject decision, and writes results to BigQuery.
 
 ## Project Structure
 
 ```
 poc-image-features/
-├── root_agent.py              # Main sequential agent orchestrating the pipeline
-├── models.py                  # Pydantic models for validation records
-├── tools/                     # Tool implementations
-│   ├── __init__.py
-│   └── bigquery_tool.py      # Tool 4: BigQuery write functionality
-├── sub_agents/                # Individual agent modules
-│   ├── extract_product/      # Tool 1: Fetch from external API
-│   ├── validate_image/       # Tool 2: Image dimension validation
-│   ├── validate_image_embedding/ # Tool 2b: Embedding-based image validation
-│   ├── validate_attribute/   # Tool 3: Attribute validation by product type
-│   ├── summarize_product/    # Summarization agent
-│   └── tools.py              # Shared tools for sub-agents
-├── pyproject.toml            # Project configuration
-├── .env.example              # Environment variables template
+├── root_agent/
+│   ├── agent.py               # Root SequentialAgent and ParallelAgent orchestration
+│   ├── models.py              # Pydantic models: ConfidenceScoreRecord, ValidationRecord
+│   ├── sub_agents/
+│   │   ├── compliance_search_agent.py   # Step 1: Fetch compliance rules via Vertex AI Search
+│   │   ├── validate_image_agent.py      # Step 2A: Gemini vision image validation
+│   │   ├── validate_attribute_agent.py  # Step 2B: Attribute, PR/Legal, spelling validation
+│   │   ├── validate_vgc_agent.py        # Optional: VGC duplicate detection (currently disabled)
+│   │   ├── confidence_score_agent.py    # Step 3: Confidence scoring + Approve/Reject decision
+│   │   └── bigquery_write_agent.py      # Step 4: Write validation record to BigQuery
+│   └── tools/
+│       ├── tools.py           # get_image_dimensions_tool (PIL-based)
+│       └── bigquery_tool.py   # bigquery_write_tool + vgc_fetch_tool
+├── docs/
+│   ├── technical_design_document.md
+│   └── product_validation_compliance.txt
+├── pyproject.toml
+├── requirements.txt
 └── README.md
 ```
 
 ## Pipeline Workflow
 
 ```
-1. Extract Product (Tool 1)
-   ↓ product_details
-2. Parallel Validation
-   ├─ Validate Image (Tool 2) → Embedding-based validation
-   │  ↓ embedding_validation_json
-   └─ Validate Attributes (Tool 3) → Check required fields by product_type
-      ↓ attribute_validation_json
-3. Calculate Confidence Scores
-   ↓ scored_products
-4. Write to BigQuery (Tool 4) → Store validation results
-   ↓ bigquery_result
+User message (JSON product list)
+  │
+  ▼  before_agent_callback: stores message → state[products_data]
+  │
+Step 1 — ComplianceSearchAgent
+  │  Reads product_category, resolves P1/P2/P3
+  │  Calls VertexAiSearchTool (parallel queries for image rules, attributes,
+  │         PR/Legal, variants, brands, vendor restrictions)
+  ▼  → compliance_search_result
+  │
+Step 2 — validation_parallel_agent (runs A and B concurrently)
+  ├─ A: ImageValidatorAgent
+  │     Injects images as Part.from_uri via before_model_callback
+  │     Calls get_image_dimensions_tool for all images in parallel
+  │     Visual compliance check: dimensions, backgrounds, watermarks,
+  │       brand consistency, spelling in images, PR/Legal text in images
+  │     → image_validation_json
+  │
+  └─ B: ValidateAttributeAgent
+        Validates: required attributes, category hierarchy (P1/P2/P3),
+          variants, brand consistency, vendor agreements,
+          PR/Legal requirements, spelling correctness
+        → attribute_validation_json
+  │
+  # C: VGCDuplicateCheckAgent (implemented, currently disabled)
+  #    Calls fetch_vgc_comparison_data → cross-VGC and intra-VGC checks
+  #    → vgc_validation_json
+  │
+Step 3 — ConfidenceScoreAgent
+  │  before_agent_callback captures ADK session_id → state[session_id]
+  │  Holistic scoring (0-100) — no fixed formula
+  │  Three-tier decision:
+  │    Accepted        → Approve
+  │    Temp Rejection  → Reject  (correctable, seller resubmits)
+  │    Perm Rejection  → Reject  (uncorrectable, delete & re-upload)
+  ▼  → validation_and_score_json (includes session_id)
+  │
+Step 4 — BigQueryWriteAgent
+  │  Assembles full record: score + decision + identity fields
+  │  (variant_group_code, brand, title, description, size, colour, seller)
+  │  Calls bigquery_write_tool
+  ▼  → bigquery_result
 ```
 
 ## Setup
@@ -49,13 +84,12 @@ gcloud auth application-default login
 
 ### 2. Configure Environment
 
-Copy `.env.example` to `.env`:
+Create a `.env` file in the project root:
 
 ```bash
 GOOGLE_CLOUD_PROJECT=your-project-id
 BQ_DATASET=product_validation
 BQ_TABLE=validation_results
-GOOGLE_API_KEY=your-google-api-key
 ```
 
 ### 3. Install Dependencies
@@ -66,10 +100,23 @@ pip install -e .
 
 ### 4. Create BigQuery Table
 
+The table must include all columns written by the pipeline:
+
 ```sql
 CREATE TABLE `your-project.product_validation.validation_results` (
-  raw_data STRING,
-  validated_data STRING
+  mirakl_product_id    STRING,
+  status               STRING,
+  confidence_score     FLOAT64,
+  validation_decision  STRING,
+  ai_comment           STRING,
+  variant_group_code   STRING,
+  brand                STRING,
+  title                STRING,
+  description          STRING,
+  size                 STRING,
+  colour               STRING,
+  seller               STRING,
+  session_id           STRING
 );
 ```
 
@@ -91,71 +138,49 @@ Navigate to `http://localhost:8000` and select `product_validation_pipeline`.
 
 ## Sample Usage
 
-Prompt the agent with:
-```
-Validate product with ID 1
-```
-
-The agent will:
-1. Fetch product from DummyJSON API
-2. Run image and attribute validation **in parallel** for better performance
-3. Calculate confidence scores based on validation results
-4. Store results in BigQuery
-
-## Embedding-Based Image Validation (New)
-
-An alternative to dimension-based image validation is the **embedding-based validation agent** that uses Vertex AI's MultiModalEmbedding model to verify if product images actually match their titles and descriptions.
-
-### How It Works
-
-1. **Downloads** the product image from the URL
-2. **Embeds** both the image and the product text (title + description) using Vertex AI
-3. **Calculates** cosine similarity between image and text embeddings
-4. **Validates** if similarity score meets the threshold (default: 0.70)
-
-### Usage
-
-The new agent is located in:
-- Agent: `sub_agents/validate_image_embedding_agent.py`
-- Tool: `tools/embedding_validation_tool.py`
-
-To use it, replace or complement the existing `validate_image_agent` in your pipeline.
-
-### Environment Variables
-
-Ensure these are set:
-```bash
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_CLOUD_LOCATION=us-central1  # or your preferred region
-```
-
-### Example Response
+Send a JSON product list as the message (the pipeline reads it automatically from the user message):
 
 ```json
-{
-  "results": [
-    {
-      "product_id": "12345",
-      "image_url": "https://...",
-      "embedding_validation": {
-        "valid": true,
-        "message": "Image matches product description"
-      }
-    }
-  ],
-  "summary": {
-    "total": 1,
-    "valid": 1,
-    "failed": 0,
-    "similarity_threshold": 0.70
+[
+  {
+    "mirakl_product_id": "PROD-001",
+    "data": {
+      "title": "Men's Classic Fit Shirt",
+      "brand": "Arrow",
+      "style_number": "VGC-12345",
+      "product_category": "25_151_13",
+      "meta_description": "...",
+      "nrf_size": "M",
+      "display_color": "Blue",
+      "main_image": { "source": "https://...", "original_url": "https://..." },
+      "alt_image_1": { "source": "https://..." }
+    },
+    "sources": [{ "provider_code": "SELLER123" }]
   }
-}
+]
 ```
 
-### Benefits Over Dimension-Only Validation
+The pipeline will:
+1. Resolve the product category to its P1/P2/P3 hierarchy and retrieve all applicable compliance rules
+2. Validate all images visually (dimensions, background, watermarks, brand, spelling) in parallel with attribute validation
+3. Assign a confidence score (0–100) and an Approve/Reject decision with point-by-point reasoning
+4. Write the full validation record to BigQuery
 
-- **Content verification**: Ensures image actually shows the product
-- **Detects wrong products**: Catches cases where wrong images are used
-- **Semantic matching**: Uses AI to understand image-text relationships
-- **Complements dimension checks**: Can be used alongside size validation
+## VGC Duplicate Detection
 
+A VGC (Variant Group Code) duplicate check agent is fully implemented and can be enabled to run alongside image and attribute validation. It detects:
+
+- **Cross-VGC duplicates**: Same seller has submitted the same product (brand + title) under a different style number
+- **Intra-VGC duplicates**: Same size + colour combination already exists in the VGC group (semantic colour comparison, e.g. "Grey" == "Gray")
+- **VGC inconsistencies**: Variants in the same group with mismatched brand or title
+
+To enable, uncomment `validate_vgc_agent` in `root_agent/agent.py` and update the ConfidenceScoreAgent prompt to incorporate `{vgc_validation_json}`.
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `GOOGLE_CLOUD_PROJECT` | Yes | — | GCP project used for all services |
+| `BQ_DATASET` | Yes | `product_validation` | BigQuery dataset |
+| `BQ_TABLE` | Yes | `validation_results` | BigQuery table |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Outside GCP | — | Service account JSON path |
