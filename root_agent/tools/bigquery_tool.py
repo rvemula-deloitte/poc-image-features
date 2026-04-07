@@ -5,6 +5,7 @@ from typing import Any
 
 from google.cloud import bigquery
 from google.adk.tools import FunctionTool
+from google.adk.tools.tool_context import ToolContext
 
 from ..models import ConfidenceScoreRecord
 
@@ -31,6 +32,7 @@ def _get_table_id() -> str:
 
 def write_to_bigquery(
     confidence_score_json: dict,
+    tool_context: ToolContext,
 ) -> dict[str, Any]:
     """
     Write confidence score results to BigQuery.
@@ -53,12 +55,17 @@ def write_to_bigquery(
     Returns:
         Dictionary with status and result details.
     """
+    # Extract session_id from ADK ToolContext (not exposed to the LLM)
+    session_id = tool_context.session.id
+
     try:
-        record = ConfidenceScoreRecord.model_validate(
+        data = (
             confidence_score_json
             if isinstance(confidence_score_json, dict)
             else confidence_score_json.model_dump()
         )
+        data.setdefault("session_id", session_id)
+        record = ConfidenceScoreRecord.model_validate(data)
     except Exception as e:
         return {"status": "error", "message": f"Invalid confidence_score_json: {str(e)}"}
 
