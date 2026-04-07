@@ -11,6 +11,7 @@ validate_vgc_agent = LlmAgent(
         "Fetches existing BigQuery variant data for the incoming product and reports "
         "VGC duplicate and colour conflict findings. Does NOT make accept/reject decisions."
     ),
+    include_contents='none',
     tools=[vgc_fetch_tool],
     instruction="""
 You are a VGC (Variant Group Code) Duplicate Detection Agent.
