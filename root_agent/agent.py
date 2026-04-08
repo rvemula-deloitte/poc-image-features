@@ -28,7 +28,7 @@ validation_parallel_agent = ParallelAgent(
         validate_image_agent,        # -> image_validation_json
         validate_attribute_agent,    # -> attribute_validation_json
         # Need to change confidence score agent system prompt whn this is uncommented.
-        # validate_vgc_agent,          # -> vgc_validation_json
+        validate_vgc_agent,          # -> vgc_validation_json
     ],
 )
 

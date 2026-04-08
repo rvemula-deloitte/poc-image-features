@@ -24,10 +24,30 @@ You have access to the following reports already stored in the session state:
 3. **Product Data** (`products_data`):
 {products_data}
 
+4. **VGC Duplicate Check Result** (`vgc_validation_json`):
+{vgc_validation_json}
 
 ## Your Task
 
-### STEP 1 — Quality Scoring
+### STEP 1 — VGC Duplicate Check (evaluate FIRST — overrides all other scoring)
+
+Read the findings from `vgc_validation_json`:
+
+- **`cross_vgc_check.matches_found` > 0**: The same seller has submitted a product with identical
+  brand and title under a different VGC code.
+  → Then set `validation_decision` = `Reject`.
+  → `ai_comment` must start with: "REJECTED — Cross-VGC duplicate: <cross_vgc_check.observation>"
+  → Skip Steps 2 and 3. Go directly to output.
+
+- **`intra_vgc_check.duplicate_found` = `true`**: An identical variant (same VGC + same size + same colour)
+  already exists in the system.
+  → Then set `validation_decision` = `Reject`. 
+  → `ai_comment` must start with: "REJECTED — Intra-VGC exact duplicate: <intra_vgc_check.observation>"
+  → Skip Steps 2 and 3. Go directly to output.
+
+- **Both checks return 0 matches**: No VGC issues found. Continue to Step 2.
+
+### STEP 2 — Quality Scoring
 
 Read both validation reports thoroughly and generate a confidence score using your own judgment.
 
@@ -76,7 +96,7 @@ Based on the compiled findings from both validation agents, classify each produc
 For `decision_reasons`, list every specific finding from the validation reports that directly drove the decision.
 If the decision is **Accepted**, list the key checks that passed.
 
-### STEP 2 — Extract identity fields from products_data
+### STEP 3 — Extract identity fields from products_data
 
 From `products_data` extract to include in output:
 - `variant_group_code` → `data.style_number`
